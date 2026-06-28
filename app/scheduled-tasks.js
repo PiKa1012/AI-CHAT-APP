@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Alert, ScrollView, Platform, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, Alert, ScrollView, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppStore } from '../src/stores';
 import { Ionicons } from '@expo/vector-icons';

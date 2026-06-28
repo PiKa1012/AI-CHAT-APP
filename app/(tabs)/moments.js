@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { aiAutoPostMoment, aiCommentOnMoment } from '../../src/services/ai';
 import { sendLocalNotification, getUnreadCount } from '../../src/services/notification';
-import { formatTime, formatDate, formatDateTime, formatRelativeTime, toBeijingTime } from '../../src/utils/time';
+import { formatTime, formatDate, formatDateTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 import { loadSetting } from '../../src/services/settings';
 

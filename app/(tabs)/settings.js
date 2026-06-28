@@ -171,6 +171,13 @@ export default function SettingsScreen() {
           onPress={() => router.push('/storage-manage')}
         />
         <SettingItem
+          icon="map"
+          title="地图API调试"
+          subtitle="测试高德地图 API 各功能"
+          color="#4A90D9"
+          onPress={() => router.push('/map-debug')}
+        />
+        <SettingItem
           icon="document-text"
           title="操作日志"
           subtitle="查看应用运行日志和错误"

@@ -3,7 +3,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
-import { formatTime, getBeijingNow, getBeijingToday } from '../src/utils/time';
+import { formatTime, getBeijingNow } from '../src/utils/time';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 

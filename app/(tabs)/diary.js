@@ -1,5 +1,4 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -14,7 +13,6 @@ const DIARY_STYLES = [
 ];
 
 export default function DiaryScreen() {
-  const router = useRouter();
   const aiCharacters = useAppStore(s => s.aiCharacters);
   const [diaries, setDiaries] = useState([]);
   const [selectedAI, setSelectedAI] = useState(null);

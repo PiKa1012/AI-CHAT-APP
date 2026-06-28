@@ -361,7 +361,7 @@ export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
   let apiResponse = await callAIAPI(messages, systemPrompt);
 
   const settings = await getAPISettings();
-  if (settings?.apiKey) {
+  if (settings?.apiKey && apiResponse && apiResponse.length < 200) {
     try {
       const summaryPrompt = `分析这段对话，提取关键信息并分类。
 
@@ -392,7 +392,7 @@ AI：${apiResponse}
         }
       } catch (e) {}
     } catch (e) {
-      console.error('保存群聊记忆失败:', e);
+      console.warn('保存群聊记忆失败:', e?.message || e);
     }
   }
 

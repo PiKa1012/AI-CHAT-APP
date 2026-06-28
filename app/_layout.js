@@ -5,7 +5,7 @@ import { useAppStore } from '../src/stores';
 import { registerForPushNotifications, addNotificationListener, addNotificationResponseListener } from '../src/services/notification';
 import { startScheduler, executeScheduledTask } from '../src/services/scheduler';
 import { StatusBar } from 'expo-status-bar';
-import { View, TouchableOpacity } from 'react-native';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { setupGlobalErrorHandler, logInfo } from '../src/utils/logger';
 import MusicPlayer from '../src/components/MusicPlayer';

@@ -97,12 +97,4 @@ export async function copyToAppStorage(uri, folder = 'images') {
   }
 }
 
-export function getImageSize(uri) {
-  return new Promise((resolve) => {
-    Image.getSize(uri, (width, height) => {
-      resolve({ width, height });
-    }, () => {
-      resolve({ width: 0, height: 0 });
-    });
-  });
-}
+

@@ -1,5 +1,5 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
-import { getBeijingNow, getBeijingToday } from '../utils/time';
+import { getBeijingNow } from '../utils/time';
 import { getAPISettings } from './settings';
 import { generateDiaryImage } from './imageGen';
 

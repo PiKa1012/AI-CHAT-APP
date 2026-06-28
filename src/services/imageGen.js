@@ -1,6 +1,5 @@
 import { loadSetting } from './settings';
 import * as FileSystem from 'expo-file-system';
-import { copyToAppStorage } from './media';
 
 const SILICONFLOW_BASE_URL = 'https://api.siliconflow.cn/v1';
 

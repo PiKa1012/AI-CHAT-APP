@@ -1,9 +1,8 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { sendLocalNotification } from '../../src/services/notification';
 import { formatTime, formatDate } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 

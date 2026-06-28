@@ -6,7 +6,7 @@ import { generateChatImage, isImageGenerationRequest, extractImageDescription } 
 import { detectAndCreateTask, getTaskTypeName } from '../../src/services/taskDetector';
 import { speakText, stopSpeaking, isSpeaking } from '../../src/services/voice';
 import { sendLocalNotification } from '../../src/services/notification';
-import { getAllEmojis, getEmojiPacks, getPackEmojis } from '../../src/services/emoji';
+import { getEmojiPacks, getPackEmojis } from '../../src/services/emoji';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { loadSetting } from '../../src/services/settings';
@@ -17,9 +17,9 @@ import { formatTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 import { searchSongs, getSongUrl, extractMusicKeyword } from '../../src/services/netease';
 import { useMusicPlayer } from '../../src/stores/musicPlayer';
+import { detectMapIntent, searchNearby, searchByKeyword, getRoute, getWeather, getAddressFromLocation, getLocationFromAddress, getCurrentLocation, extractCity, extractLocation } from '../../src/services/map';
 
 
-const QUICK_REPLIES = ['好的', '没问题', '哈哈哈', '嗯嗯', '知道了', '谢谢', '不客气', '加油', '晚安', '在干嘛'];
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
@@ -369,7 +369,7 @@ export default function ChatScreen() {
     const aiId = members[0]?.member_id;
 
     const musicKeyword = extractMusicKeyword(messageText);
-    if (musicKeyword && conversation?.type === 'private' && aiId) {
+    if (musicKeyword && settings?.enableMusic && aiId) {
       setIsTyping(true);
       try {
         const results = await searchSongs(musicKeyword, 5);
@@ -401,6 +401,76 @@ export default function ChatScreen() {
       }
     }
     
+    const mapIntent = detectMapIntent(messageText);
+    if (mapIntent && settings?.enableMap && settings?.amapApiKey) {
+      setIsTyping(true);
+      try {
+        const ipInfo = await getCurrentLocation();
+        let text = '';
+        const senderId = aiId || 1;
+
+        if (mapIntent === 'nearby_food' || mapIntent === 'nearby_place' || mapIntent === 'recommend') {
+          const keyword = mapIntent === 'nearby_place' ? '厕所|医院|药店' : mapIntent === 'nearby_food' ? '美食|餐厅|小吃' : '景点|公园|好玩';
+          const pois = ipInfo.location
+            ? await searchNearby(ipInfo.location, keyword)
+            : await searchByKeyword(keyword, ipInfo.city);
+          if (pois.length > 0) {
+            const names = pois.slice(0, 5).map((p, i) => `${i+1}. ${p.name}${p.distance ? `（${Math.round(parseInt(p.distance))}m）` : ''}`).join('\n');
+            text = `附近找到以下地点：\n${names}`;
+          } else {
+            text = '附近没找到相关地点';
+          }
+        } else if (mapIntent === 'weather') {
+          const city = extractCity(messageText) || ipInfo.city;
+          const forecasts = await getWeather(city);
+          if (forecasts.length > 0) {
+            const f = forecasts[0];
+            text = `${city}天气：\n白天：${f.dayWeather}，${f.dayTemp}°C\n夜间：${f.nightWeather}，${f.nightTemp}°C`;
+          } else {
+            text = '获取天气失败';
+          }
+        } else if (mapIntent === 'location') {
+          if (ipInfo.location) {
+            const addr = await getAddressFromLocation(ipInfo.location);
+            text = `你当前在：${addr.address || ipInfo.city}`;
+          } else if (ipInfo.city) {
+            text = `你当前在：${ipInfo.province} ${ipInfo.city}`;
+          } else {
+            text = '获取位置失败';
+          }
+        } else if (mapIntent === 'route') {
+          const locations = extractLocation(messageText);
+          if (locations.length >= 2) {
+            try {
+              const [originName, destName] = locations;
+              const [originGeo, destGeo] = await Promise.all([
+                getLocationFromAddress(originName, ipInfo.city),
+                getLocationFromAddress(destName, ipInfo.city),
+              ]);
+              const originLoc = originGeo.geocodes?.[0]?.location;
+              const destLoc = destGeo.geocodes?.[0]?.location;
+                if (originLoc && destLoc) {
+                const route = await getRoute(originLoc, destLoc, 'driving', ipInfo.city);
+                text = `从${originName}到${destName}：\n距离：${(route.distance / 1000).toFixed(1)}km\n预计：${Math.round(parseInt(route.duration) / 60)}分钟\n\n${route.steps.slice(0, 8).join('\n')}`;
+              } else {
+                text = '无法定位到起终点，请提供更具体的地名';
+              }
+            } catch (e) {
+              text = `路线查询失败：${e.message}`;
+            }
+          } else {
+            text = '请提供起终点，例如「从西湖到灵隐寺怎么走」';
+          }
+        }
+
+        await sendMessage(parseInt(id), 'ai', senderId, text);
+      } catch (e) {
+        await sendMessage(parseInt(id), 'ai', aiId || 1, `地图查询失败：${e.message}`);
+      }
+      setIsTyping(false);
+      return;
+    }
+
     if (settings?.enableImageGen && settings?.enableChatImage && isImageGenerationRequest(messageText)) {
       setIsTyping(true);
       try {
@@ -574,16 +644,6 @@ export default function ChatScreen() {
     );
   };
 
-  const getAIName = (aiId) => {
-    const ai = aiCharacters.find(a => a.id === aiId);
-    return ai?.name || 'AI';
-  };
-
-  const getAIAvatar = (aiId) => {
-    const ai = aiCharacters.find(a => a.id === aiId);
-    return ai?.avatar || ai?.name?.[0] || 'A';
-  };
-
   const getAIVoice = (aiId) => {
     const ai = aiCharacters.find(a => a.id === aiId);
     return ai?.voice_id || '默认';
@@ -738,7 +798,7 @@ export default function ChatScreen() {
               <Image source={{ uri: item.image_uri }} style={styles.emojiImage} />
             </TouchableOpacity>
           )}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, i) => (item.id != null ? item.id : `item-${i}`).toString()}
           numColumns={5}
           contentContainerStyle={styles.emojiGrid}
           ListEmptyComponent={
@@ -778,7 +838,7 @@ export default function ChatScreen() {
         </View>
         <FlatList
           data={groupMembers}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, i) => (item.id != null ? item.id : `item-${i}`).toString()}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.memberItem}
@@ -821,7 +881,7 @@ export default function ChatScreen() {
         data={[...messages].reverse()}
         inverted
         renderItem={renderMessage}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item, index) => (item.id != null ? item.id : `msg-${index}`).toString()}
         contentContainerStyle={styles.messagesContent}
         style={[styles.messagesContainer, !isReady && { opacity: 0 }]}
         onContentSizeChange={handleContentSizeChange}
@@ -1088,7 +1148,7 @@ export default function ChatScreen() {
             )}
             <FlatList
               data={musicResults}
-              keyExtractor={(item, i) => `${item.id}-${i}`}
+              keyExtractor={(item, i) => (item.id != null ? `${item.id}-${i}` : `music-${i}`)}
               renderItem={({ item, index }) => (
                 <TouchableOpacity style={styles.musicResultItem} onPress={() => handleMusicPlay(item)}>
                   <Image

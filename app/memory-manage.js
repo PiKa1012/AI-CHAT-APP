@@ -1,5 +1,4 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, Modal } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useAppStore } from '../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -16,7 +15,6 @@ const MEMORY_TYPES = [
 ];
 
 export default function MemoryManageScreen() {
-  const router = useRouter();
   const aiCharacters = useAppStore(s => s.aiCharacters);
   const [selectedAI, setSelectedAI] = useState(null);
   const [memories, setMemories] = useState([]);

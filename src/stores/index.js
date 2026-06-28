@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { getDatabase, executeQuery, executeInsert, executeUpdate } from '../database';
-import { getBeijingNow } from '../utils/time';
 
 export const useAppStore = create((set, get) => ({
   user: null,

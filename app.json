@@ -22,7 +22,9 @@
         "NOTIFICATIONS",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "CAMERA"
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ],
       "package": "com.aicompanion.app"
     },
@@ -31,6 +33,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "允许 $(PRODUCT_NAME) 获取你的位置信息",
+          "locationWhenInUsePermission": "允许 $(PRODUCT_NAME) 获取你的位置信息"
+        }
+      ],
       [
         "expo-notifications",
         {

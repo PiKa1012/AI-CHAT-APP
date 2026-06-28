@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Image, ScrollView, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Image, ScrollView, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import * as FileSystem from 'expo-file-system';

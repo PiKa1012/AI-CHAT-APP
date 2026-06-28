@@ -91,9 +91,15 @@ export default function APISettingsScreen() {
   const [imageGenModel, setImageGenModel] = useState('');
   
   // NetEase Music settings
+  const [enableMusic, setEnableMusic] = useState(false);
   const [neteaseApiBaseUrl, setNeteaseApiBaseUrl] = useState('');
   const [isTestingMusic, setIsTestingMusic] = useState(false);
-  
+
+  // Amap settings
+  const [enableMap, setEnableMap] = useState(false);
+  const [amapApiKey, setAmapApiKey] = useState('');
+  const [isTestingAmap, setIsTestingAmap] = useState(false);
+
   const [isTesting, setIsTesting] = useState(false);
   const [isTestingVision, setIsTestingVision] = useState(false);
   const [isTestingTTS, setIsTestingTTS] = useState(false);
@@ -132,6 +138,9 @@ export default function APISettingsScreen() {
         setImageGenBaseUrl(data.imageGenBaseUrl || '');
         setImageGenModel(data.imageGenModel || '');
         setNeteaseApiBaseUrl(data.neteaseApiBaseUrl || '');
+        setEnableMusic(data.enableMusic !== false);
+        setAmapApiKey(data.amapApiKey || '');
+        setEnableMap(data.enableMap !== false);
       }
     } catch (e) {}
   };
@@ -154,6 +163,30 @@ export default function APISettingsScreen() {
       Alert.alert('失败', `网络错误: ${e.message}`);
     }
     setIsTestingMusic(false);
+  };
+
+  const testAmapConnection = async () => {
+    if (!amapApiKey) {
+      Alert.alert('提示', '请先输入高德 Web API Key');
+      return;
+    }
+    setIsTestingAmap(true);
+    try {
+      const response = await fetch(`https://restapi.amap.com/v3/ip?key=${amapApiKey}&output=JSON`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === '1') {
+          Alert.alert('成功', `API 连接正常！IP 归属：${data.city || data.province || '未知'}`);
+        } else {
+          Alert.alert('失败', `API 错误: ${data.info || '未知错误'}`);
+        }
+      } else {
+        Alert.alert('失败', `连接错误 (${response.status})`);
+      }
+    } catch (e) {
+      Alert.alert('失败', `网络错误: ${e.message}`);
+    }
+    setIsTestingAmap(false);
   };
 
   const saveSettings = async () => {
@@ -184,6 +217,9 @@ export default function APISettingsScreen() {
         imageGenBaseUrl,
         imageGenModel,
         neteaseApiBaseUrl,
+        enableMusic,
+        amapApiKey,
+        enableMap,
       });
       clearAPISettingsCache();
       Alert.alert('成功', '设置已保存');
@@ -650,9 +686,17 @@ export default function APISettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🎵 网易云音乐</Text>
-        
-        <Text style={styles.label}>网易云API地址</Text>
+        <View style={styles.switchRow}>
+          <View style={styles.switchInfo}>
+            <Ionicons name="musical-notes" size={20} color="#E6A23C" />
+            <Text style={styles.switchLabel}>🎵 网易云音乐</Text>
+            <Text style={styles.switchDesc}>聊天搜歌播放</Text>
+          </View>
+          <Switch value={enableMusic} onValueChange={setEnableMusic} trackColor={{ true: '#E6A23C' }} />
+        </View>
+        {enableMusic && (
+          <View style={styles.subSection}>
+            <Text style={styles.label}>网易云API地址</Text>
         <TextInput
           style={styles.input}
           value={neteaseApiBaseUrl}
@@ -665,6 +709,43 @@ export default function APISettingsScreen() {
         <TouchableOpacity style={styles.testSmallButton} onPress={testMusicConnection} disabled={isTestingMusic}>
           <Text style={styles.testSmallButtonText}>{isTestingMusic ? '测试中...' : '测试连接'}</Text>
         </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.switchRow}>
+          <View style={styles.switchInfo}>
+            <Ionicons name="map" size={20} color="#4A90D9" />
+            <Text style={styles.switchLabel}>🗺️ 高德地图</Text>
+            <Text style={styles.switchDesc}>位置天气路线查询</Text>
+          </View>
+          <Switch value={enableMap} onValueChange={setEnableMap} trackColor={{ true: '#4A90D9' }} />
+        </View>
+        {enableMap && (
+          <View style={styles.subSection}>
+            <Text style={styles.label}>高德 Web API Key</Text>
+        <TextInput
+          style={styles.input}
+          value={amapApiKey}
+          onChangeText={setAmapApiKey}
+          placeholder="输入高德 Web 服务 API Key"
+          placeholderTextColor="#999"
+        />
+        <Text style={styles.hint}>在控制台 → 应用管理 → 创建应用后获取 Key，启用「Web 服务」</Text>
+
+        <TouchableOpacity style={styles.testSmallButton} onPress={testAmapConnection} disabled={isTestingAmap}>
+          <Text style={styles.testSmallButtonText}>{isTestingAmap ? '测试中...' : '测试连接'}</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.label}>使用示例（在聊天中直接输入）</Text>
+        <Text style={styles.featureItem}>🗺️ 附近搜索：<Text style={styles.exampleText}>"附近有什么好吃的"</Text></Text>
+        <Text style={styles.featureItem}>🗺️ 地点查询：<Text style={styles.exampleText}>"帮我查一下天安门"</Text></Text>
+        <Text style={styles.featureItem}>🗺️ 路线规划：<Text style={styles.exampleText}>"从王府井到故宫怎么走"</Text></Text>
+        <Text style={styles.featureItem}>🗺️ 天气查询：<Text style={styles.exampleText}>"今天天气怎么样"</Text></Text>
+        <Text style={styles.featureItem}>🗺️ 位置定位：<Text style={styles.exampleText}>"我现在在哪"</Text></Text>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={saveSettings}>
@@ -877,6 +958,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 4,
+  },
+  featureItem: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 22,
+  },
+  exampleText: {
+    color: '#4A90D9',
+    fontFamily: 'monospace',
   },
   infoTitle: {
     fontSize: 14,

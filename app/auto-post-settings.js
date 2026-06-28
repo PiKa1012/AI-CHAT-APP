@@ -1,11 +1,9 @@
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, TextInput, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { saveAutoPostSettings, getAutoPostSettingsExport } from '../src/services/scheduler';
 
 export default function AutoPostSettingsScreen() {
-  const router = useRouter();
   const [settings, setSettings] = useState({
     autoMomentEnabled: false,
     autoMomentInterval: 4,
