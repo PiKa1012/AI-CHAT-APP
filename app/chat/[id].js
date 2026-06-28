@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { getAIResponse, getGroupAIResponse, findMentionedAI, analyzeImage } from '../../src/services/ai';
@@ -15,6 +15,8 @@ import * as FileSystem from 'expo-file-system';
 import { copyToAppStorage } from '../../src/services/media';
 import { formatTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
+import { searchSongs, getSongUrl, extractMusicKeyword } from '../../src/services/netease';
+import { useMusicPlayer } from '../../src/stores/musicPlayer';
 
 
 const QUICK_REPLIES = ['好的', '没问题', '哈哈哈', '嗯嗯', '知道了', '谢谢', '不客气', '加油', '晚安', '在干嘛'];
@@ -53,6 +55,11 @@ export default function ChatScreen() {
   const [pendingEmoji, setPendingEmoji] = useState(null);
   const [showNewMessageHint, setShowNewMessageHint] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [showMusicSearch, setShowMusicSearch] = useState(false);
+  const [musicKeyword, setMusicKeyword] = useState('');
+  const [musicResults, setMusicResults] = useState([]);
+  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
+  const playSong = useMusicPlayer(s => s.playSong);
   const flatListRef = useRef(null);
   const isAtBottom = useRef(true);
   const lastContentHeight = useRef(0);
@@ -360,6 +367,24 @@ export default function ChatScreen() {
 
     const members = await getConversationMembers();
     const aiId = members[0]?.member_id;
+
+    const musicKeyword = extractMusicKeyword(messageText);
+    if (musicKeyword && conversation?.type === 'private' && aiId) {
+      setIsTyping(true);
+      try {
+        const results = await searchSongs(musicKeyword, 5);
+        if (results.length > 0) {
+          await sendMessage(parseInt(id), 'ai', aiId, `找到以下「${musicKeyword}」相关歌曲：`);
+          await sendMessage(parseInt(id), 'ai', aiId, JSON.stringify(results), 'music_list');
+        } else {
+          await sendMessage(parseInt(id), 'ai', aiId, `没找到「${musicKeyword}」相关歌曲`);
+        }
+      } catch (error) {
+        await sendMessage(parseInt(id), 'ai', aiId, `搜索音乐失败：${error.message}`);
+      }
+      setIsTyping(false);
+      return;
+    }
     
     if (aiId) {
       try {
@@ -483,6 +508,46 @@ export default function ChatScreen() {
     }
   };
 
+  const handleMusicPlay = async (song) => {
+    if (!song.url) {
+      try {
+        const url = await getSongUrl(song.id);
+        if (url) {
+          song = { ...song, url };
+        }
+      } catch (e) {
+        Alert.alert('播放失败', '无法获取播放链接');
+        return;
+      }
+    }
+    await playSong(song);
+  };
+
+  const handleMusicSearch = async () => {
+    const keyword = musicKeyword.trim();
+    if (!keyword) return;
+    setIsSearchingMusic(true);
+    try {
+      const results = await searchSongs(keyword);
+      setMusicResults(results);
+    } catch (e) {
+      Alert.alert('搜索失败', e.message);
+      setMusicResults([]);
+    }
+    setIsSearchingMusic(false);
+  };
+
+  const handleSendMusicResult = async () => {
+    const results = musicResults;
+    if (results.length === 0) return;
+    const convMembers = await getConversationMembers();
+    const aiId = convMembers[0]?.member_id || aiCharacters[0]?.id || 1;
+    await sendMessage(parseInt(id), 'ai', aiId, JSON.stringify(results), 'music_list');
+    setShowMusicSearch(false);
+    setMusicKeyword('');
+    setMusicResults([]);
+  };
+
   const handleEmojiSelect = async (emoji) => {
     setPendingEmoji(emoji.image_uri);
     setPendingImage(null);
@@ -524,11 +589,37 @@ export default function ChatScreen() {
     return ai?.voice_id || '默认';
   };
 
+  const renderMusicCard = (song, index) => (
+    <TouchableOpacity key={`${song.id}-${index}`} style={styles.musicCard} onPress={() => handleMusicPlay(song)}>
+      <Image
+        source={{ uri: song.cover || 'https://via.placeholder.com/44/4A90D9/fff?text=♫' }}
+        style={styles.musicCardCover}
+      />
+      <View style={styles.musicCardInfo}>
+        <Text style={styles.musicCardName} numberOfLines={1}>{song.name || '未知歌曲'}</Text>
+        <Text style={styles.musicCardArtist} numberOfLines={1}>{song.artist || '未知歌手'}</Text>
+      </View>
+      <View style={styles.musicCardPlay}>
+        <Ionicons name="play-circle" size={32} color="#4A90D9" />
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderMusicList = (songs) => {
+    if (!songs || songs.length === 0) return null;
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.musicCardScroll}>
+        {songs.map((song, i) => renderMusicCard(song, i))}
+      </ScrollView>
+    );
+  };
+
   const renderMessage = ({ item }) => {
     const isUser = item.sender_type === 'user';
     const isSpeakingThis = speakingMessageId === item.id;
     const isEmoji = item.message_type === 'emoji';
     const isImage = item.message_type === 'image';
+    const isMusicList = item.message_type === 'music_list';
     const ai = aiCharacters.find(a => a.id === item.sender_id);
     const aiAvatar = ai?.avatar;
     const aiName = ai?.name || 'AI';
@@ -554,6 +645,8 @@ export default function ChatScreen() {
             <TouchableOpacity onPress={() => setPreviewImage(item.content)}>
               <Image source={{ uri: item.content }} style={styles.emojiMessage} />
             </TouchableOpacity>
+          ) : isMusicList ? (
+            (() => { try { const songs = JSON.parse(item.content || '[]'); return Array.isArray(songs) && songs.length > 0 ? renderMusicList(songs) : <Text style={styles.messageText}>暂无歌曲数据</Text>; } catch (e) { return <Text style={styles.messageText}>歌曲数据解析失败</Text>; }})()
           ) : (
             <Text style={[styles.messageText, isUser && styles.userMessageText]}>
               {item.content}
@@ -799,6 +892,20 @@ export default function ChatScreen() {
               </View>
               <Text style={styles.moreMenuText}>发图片</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.moreMenuItem}
+              onPress={() => {
+                setShowMoreMenu(false);
+                setShowMusicSearch(true);
+                setMusicKeyword('');
+                setMusicResults([]);
+              }}
+            >
+              <View style={[styles.moreMenuIcon, { backgroundColor: '#9B59B615' }]}>
+                <Ionicons name="musical-notes" size={22} color="#9B59B6" />
+              </View>
+              <Text style={styles.moreMenuText}>搜音乐</Text>
+            </TouchableOpacity>
             {conversation?.type === 'group' && (
               <>
                 <TouchableOpacity
@@ -939,6 +1046,74 @@ export default function ChatScreen() {
             <Text style={styles.avatarPreviewName}>{previewAvatar?.name}</Text>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={showMusicSearch}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => { setShowMusicSearch(false); setMusicResults([]); }}
+      >
+        <View style={styles.musicSearchOverlay}>
+          <View style={styles.musicSearchContainer}>
+            <View style={styles.musicSearchHeader}>
+              <Text style={styles.musicSearchTitle}>搜音乐</Text>
+              <TouchableOpacity onPress={() => { setShowMusicSearch(false); setMusicResults([]); }}>
+                <Ionicons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.musicSearchInputRow}>
+              <TextInput
+                style={styles.musicSearchInput}
+                value={musicKeyword}
+                onChangeText={setMusicKeyword}
+                placeholder="输入歌曲名或歌手"
+                placeholderTextColor="#999"
+                onSubmitEditing={handleMusicSearch}
+                returnKeyType="search"
+              />
+              <TouchableOpacity style={styles.musicSearchBtn} onPress={handleMusicSearch} disabled={isSearchingMusic}>
+                {isSearchingMusic ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="search" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+            {musicResults.length > 0 && (
+              <TouchableOpacity style={styles.sendToChatBtn} onPress={handleSendMusicResult}>
+                <Ionicons name="paper-plane" size={16} color="#fff" />
+                <Text style={styles.sendToChatBtnText}>发送到聊天 ({musicResults.length}首)</Text>
+              </TouchableOpacity>
+            )}
+            <FlatList
+              data={musicResults}
+              keyExtractor={(item, i) => `${item.id}-${i}`}
+              renderItem={({ item, index }) => (
+                <TouchableOpacity style={styles.musicResultItem} onPress={() => handleMusicPlay(item)}>
+                  <Image
+                    source={{ uri: item.cover || 'https://via.placeholder.com/44/4A90D9/fff?text=♫' }}
+                    style={styles.musicResultCover}
+                  />
+                  <View style={styles.musicResultInfo}>
+                    <Text style={styles.musicResultName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.musicResultArtist} numberOfLines={1}>{item.artist}</Text>
+                  </View>
+                  <Ionicons name="play-circle" size={28} color="#4A90D9" />
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                !isSearchingMusic ? (
+                  <View style={styles.musicSearchEmpty}>
+                    <Ionicons name="musical-notes-outline" size={48} color="#ccc" />
+                    <Text style={styles.musicSearchEmptyText}>搜索你想听的歌曲</Text>
+                  </View>
+                ) : null
+              }
+              contentContainerStyle={styles.musicResultList}
+            />
+          </View>
+        </View>
       </Modal>
 
       <Modal
@@ -1501,5 +1676,145 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '500',
+  },
+
+  musicCardList: {
+    gap: 6,
+  },
+  musicCardScroll: {
+    flexDirection: 'row',
+    marginVertical: 4,
+  },
+  musicCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    padding: 8,
+    gap: 10,
+  },
+  musicCardCover: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    backgroundColor: '#e0e0e0',
+  },
+  musicCardInfo: {
+    flex: 1,
+  },
+  musicCardName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  musicCardArtist: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 1,
+  },
+  musicCardPlay: {
+    padding: 4,
+  },
+
+  musicSearchOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  musicSearchContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  musicSearchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  musicSearchTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  musicSearchInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 8,
+  },
+  musicSearchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 15,
+    color: '#333',
+  },
+  musicSearchBtn: {
+    backgroundColor: '#4A90D9',
+    borderRadius: 8,
+    padding: 10,
+    paddingHorizontal: 14,
+  },
+  sendToChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#67C23A',
+    borderRadius: 8,
+    padding: 10,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    gap: 6,
+  },
+  sendToChatBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  musicResultList: {
+    paddingHorizontal: 12,
+  },
+  musicResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: 10,
+  },
+  musicResultCover: {
+    width: 44,
+    height: 44,
+    borderRadius: 6,
+    backgroundColor: '#e0e0e0',
+  },
+  musicResultInfo: {
+    flex: 1,
+  },
+  musicResultName: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
+  },
+  musicResultArtist: {
+    fontSize: 13,
+    color: '#999',
+    marginTop: 1,
+  },
+  musicSearchEmpty: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  musicSearchEmptyText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
   },
 });

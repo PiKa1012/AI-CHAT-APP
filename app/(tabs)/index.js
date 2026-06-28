@@ -169,7 +169,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           <Text style={[styles.lastMessage, hasUnread && styles.lastMessageUnread]} numberOfLines={1}>
-            {item.last_message_type === 'image' ? '[图片]' : (item.last_message || '暂无消息')}
+            {item.last_message_type === 'image' ? '[图片]' : item.last_message_type === 'music_list' ? (() => { try { const songs = JSON.parse(item.last_message || '[]'); return songs.length > 0 ? `[音乐] ${songs[0].name || ''}` : '[音乐]'; } catch (e) { return '[音乐]'; } })() : (item.last_message || '暂无消息')}
           </Text>
         </View>
       </TouchableOpacity>

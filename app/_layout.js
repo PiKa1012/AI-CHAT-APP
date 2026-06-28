@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { setupGlobalErrorHandler, logInfo } from '../src/utils/logger';
+import MusicPlayer from '../src/components/MusicPlayer';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -85,6 +86,7 @@ export default function RootLayout() {
         <Stack.Screen name="memory-manage" options={{ title: '记忆管理' }} />
         <Stack.Screen name="notifications" options={{ title: '通知中心' }} />
       </Stack>
+      <MusicPlayer />
     </View>
   );
 }

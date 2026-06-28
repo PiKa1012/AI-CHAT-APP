@@ -90,6 +90,10 @@ export default function APISettingsScreen() {
   const [imageGenBaseUrl, setImageGenBaseUrl] = useState('');
   const [imageGenModel, setImageGenModel] = useState('');
   
+  // NetEase Music settings
+  const [neteaseApiBaseUrl, setNeteaseApiBaseUrl] = useState('');
+  const [isTestingMusic, setIsTestingMusic] = useState(false);
+  
   const [isTesting, setIsTesting] = useState(false);
   const [isTestingVision, setIsTestingVision] = useState(false);
   const [isTestingTTS, setIsTestingTTS] = useState(false);
@@ -127,8 +131,29 @@ export default function APISettingsScreen() {
         setImageGenApiKey(data.imageGenApiKey || '');
         setImageGenBaseUrl(data.imageGenBaseUrl || '');
         setImageGenModel(data.imageGenModel || '');
+        setNeteaseApiBaseUrl(data.neteaseApiBaseUrl || '');
       }
     } catch (e) {}
+  };
+
+  const testMusicConnection = async () => {
+    if (!neteaseApiBaseUrl) {
+      Alert.alert('提示', '请先输入网易云API地址');
+      return;
+    }
+    setIsTestingMusic(true);
+    try {
+      const response = await fetch(`${neteaseApiBaseUrl}/search?keywords=test&limit=1&randomCNIP=true`);
+      if (response.ok) {
+        Alert.alert('成功', 'API连接正常！');
+      } else {
+        const text = await response.text().catch(() => '');
+        Alert.alert('失败', `连接错误 (${response.status}): ${text.substring(0, 100)}`);
+      }
+    } catch (e) {
+      Alert.alert('失败', `网络错误: ${e.message}`);
+    }
+    setIsTestingMusic(false);
   };
 
   const saveSettings = async () => {
@@ -158,6 +183,7 @@ export default function APISettingsScreen() {
         imageGenApiKey,
         imageGenBaseUrl,
         imageGenModel,
+        neteaseApiBaseUrl,
       });
       clearAPISettingsCache();
       Alert.alert('成功', '设置已保存');
@@ -623,6 +649,24 @@ export default function APISettingsScreen() {
         )}
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>🎵 网易云音乐</Text>
+        
+        <Text style={styles.label}>网易云API地址</Text>
+        <TextInput
+          style={styles.input}
+          value={neteaseApiBaseUrl}
+          onChangeText={setNeteaseApiBaseUrl}
+          placeholder="https://netease-cloud-music-api-xxx.vercel.app"
+          placeholderTextColor="#999"
+        />
+        <Text style={styles.hint}>部署 NeteaseCloudMusicApi Enhanced 后获得的地址</Text>
+
+        <TouchableOpacity style={styles.testSmallButton} onPress={testMusicConnection} disabled={isTestingMusic}>
+          <Text style={styles.testSmallButtonText}>{isTestingMusic ? '测试中...' : '测试连接'}</Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity style={styles.saveButton} onPress={saveSettings}>
         <Text style={styles.saveButtonText}>保存设置</Text>
       </TouchableOpacity>
@@ -828,6 +872,11 @@ const styles = StyleSheet.create({
     margin: 16,
     padding: 16,
     borderRadius: 8,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
   },
   infoTitle: {
     fontSize: 14,
