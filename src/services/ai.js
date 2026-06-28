@@ -396,7 +396,7 @@ AI：${apiResponse}
     }
   }
 
-  await analyzeAndUpdateMood(aiId, lastMessage?.content || '', apiResponse);
+  await analyzeAndUpdateMood(aiId, lastMessage?.content || '', apiResponse, character);
   const updatedMood = await getAIMood(aiId);
   const emoji = await tryGetEmojiForResponse(character, apiResponse, updatedMood);
   
