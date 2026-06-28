@@ -9,7 +9,7 @@ import { generateMomentImage } from './imageGen';
 
 export { clearAPISettingsCache as clearSettingsCache };
 
-async function callAIAPI(messages, systemPrompt = '') {
+export async function callAIAPI(messages, systemPrompt = '') {
   const settings = await getAPISettings();
   
   if (!settings?.apiKey) {
@@ -200,7 +200,7 @@ function getCurrentTimeInfo() {
   };
 }
 
-function getPersonalityPrompt(character) {
+export function getPersonalityPrompt(character) {
   const personality = character.personality || '友好';
   const name = character.name;
   const desc = character.description || '';
@@ -266,10 +266,41 @@ export async function getAIResponse(aiId, userMessage, recentMessages = []) {
     }
   }
 
-  await executeInsert(
-    'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
-    [aiId, 'conversation', `用户说：${userMessage}，我回复：${apiResponse}`, 3]
-  );
+  const apiSettings = await getAPISettings();
+  if (apiSettings?.apiKey) {
+    try {
+      const summaryPrompt = `分析这段对话，提取关键信息并分类。
+
+用户：${userMessage}
+AI：${apiResponse}
+
+分类规则：
+- fact：用户个人信息（姓名、年龄、职业等）
+- preference：用户喜好（喜欢什么、讨厌什么）
+- event：发生的具体事件
+
+输出JSON格式：
+{"type":"分类","content":"总结内容"}
+
+如果没什么值得记住的，输出：{"type":"none","content":""}
+
+只输出JSON，不要其他文字。`;
+      
+      const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '');
+      
+      try {
+        const parsed = JSON.parse(result);
+        if (parsed.type && parsed.type !== 'none' && parsed.content) {
+          await executeInsert(
+            'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
+            [aiId, parsed.type, parsed.content, 5]
+          );
+        }
+      } catch (e) {}
+    } catch (e) {
+      console.error('保存对话记忆失败:', e);
+    }
+  }
 
   if (recentMessages.length > 0 && recentMessages.length % 10 === 0) {
     extractMemories(aiId, recentMessages.slice(-20));
@@ -414,8 +445,8 @@ export async function aiCommentOnMoment(momentId, parentCommentId = null, userCo
   const comment = await callAIAPI([{ role: 'user', content: userComment ? '回复用户' : '评论朋友圈' }], prompt);
 
   const store = useAppStore.getState();
-  await store.commentOnMoment(momentId, 'ai', replyAI.id, comment, parentCommentId);
-  return comment;
+  const newCommentId = await store.commentOnMoment(momentId, 'ai', replyAI.id, comment, parentCommentId);
+  return { text: comment, commentId: newCommentId };
 }
 
 export async function aiAutoChat() {

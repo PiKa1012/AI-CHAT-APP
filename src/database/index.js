@@ -97,6 +97,7 @@ async function initDatabase(database) {
       memory_type TEXT NOT NULL,
       content TEXT NOT NULL,
       importance INTEGER DEFAULT 5,
+      context TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (ai_id) REFERENCES ai_characters(id)
     );
@@ -107,6 +108,9 @@ async function initDatabase(database) {
       task_type TEXT NOT NULL,
       content TEXT,
       schedule_time TEXT,
+      repeat_type TEXT DEFAULT 'daily',
+      execute_date TEXT,
+      executed_count INTEGER DEFAULT 0,
       is_active INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (ai_id) REFERENCES ai_characters(id)
@@ -170,6 +174,16 @@ async function initDatabase(database) {
     CREATE TABLE IF NOT EXISTS user_settings (
       key TEXT PRIMARY KEY,
       value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      body TEXT,
+      type TEXT,
+      data TEXT,
+      is_read INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 }

@@ -292,8 +292,8 @@ export const useAppStore = create((set, get) => ({
 
   addScheduledTask: async (task) => {
     const id = await executeInsert(
-      'INSERT INTO scheduled_tasks (ai_id, task_type, content, schedule_time) VALUES (?, ?, ?, ?)',
-      [task.ai_id, task.task_type, task.content, task.schedule_time]
+      'INSERT INTO scheduled_tasks (ai_id, task_type, content, schedule_time, repeat_type, execute_date) VALUES (?, ?, ?, ?, ?, ?)',
+      [task.ai_id, task.task_type, task.content, task.schedule_time, task.repeat_type || 'daily', task.execute_date || null]
     );
     await get().loadScheduledTasks();
     return id;

@@ -11,6 +11,8 @@ const MEMORY_TYPES = [
   { id: 'preference', name: '喜好', icon: 'heart', color: '#F56C6C' },
   { id: 'event', name: '事件', icon: 'calendar', color: '#67C23A' },
   { id: 'summary', name: '摘要', icon: 'document-text', color: '#E6A23C' },
+  { id: 'conversation', name: '对话', icon: 'chatbubble', color: '#9B59B6' },
+  { id: 'emotion', name: '情绪', icon: 'heart-circle', color: '#FF69B4' },
 ];
 
 export default function MemoryManageScreen() {

@@ -109,16 +109,9 @@ export default function SettingsScreen() {
         <SettingItem
           icon="calendar"
           title="定时任务"
-          subtitle="设置AI定时发朋友圈、主动聊天"
+          subtitle="管理定时任务和自动发布"
           color="#E6A23C"
           onPress={() => router.push('/scheduled-tasks')}
-        />
-        <SettingItem
-          icon="sparkles"
-          title="自动发布设置"
-          subtitle="配置AI自动发朋友圈、写日记"
-          color="#9B59B6"
-          onPress={() => router.push('/auto-post-settings')}
         />
         <SettingItem
           icon="heart"

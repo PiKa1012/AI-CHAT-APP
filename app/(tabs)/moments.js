@@ -1,16 +1,17 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, Animated, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { aiAutoPostMoment, aiCommentOnMoment } from '../../src/services/ai';
-import { sendLocalNotification } from '../../src/services/notification';
+import { sendLocalNotification, getUnreadCount } from '../../src/services/notification';
 import { formatTime, formatDate, formatDateTime, formatRelativeTime, toBeijingTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 import { loadSetting } from '../../src/services/settings';
 
 export default function MomentsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const moments = useAppStore(s => s.moments);
   const loadMoments = useAppStore(s => s.loadMoments);
   const addMoment = useAppStore(s => s.addMoment);
@@ -29,11 +30,73 @@ export default function MomentsScreen() {
   const [expandedComments, setExpandedComments] = useState({});
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [userProfile, setUserProfile] = useState({ name: '我', avatar: null });
+  const [unreadCount, setUnreadCount] = useState(0);
+  const flatListRef = useRef(null);
+  const commentRefs = useRef({});
+  const [highlightComment, setHighlightComment] = useState(null);
+  const lastHandledRef = useRef(null);
 
   useEffect(() => {
     loadMoments();
     loadUserProfile();
+    loadUnreadCount();
   }, []);
+
+  useEffect(() => {
+    const paramKey = `${params.scrollToMoment}-${params.commentId}`;
+    
+    if (params.scrollToMoment && moments.length > 0 && lastHandledRef.current !== paramKey) {
+      lastHandledRef.current = paramKey;
+      
+      const targetId = parseInt(params.scrollToMoment);
+      const moment = moments.find(m => m.id === targetId);
+      
+      if (moment && params.commentId && moment.comments) {
+        const commentId = parseInt(params.commentId);
+        const comment = moment.comments.find(c => c.id === commentId);
+        
+        if (comment) {
+          let rootCommentId = comment.id;
+          if (comment.parent_id) {
+            const parent = moment.comments.find(c => c.id === comment.parent_id);
+            rootCommentId = parent?.parent_id || comment.parent_id;
+          }
+          
+          setExpandedComments(prev => ({ ...prev, [rootCommentId]: true }));
+          
+          setTimeout(() => {
+            const commentRef = commentRefs.current[commentId];
+            if (commentRef) {
+              commentRef.measureInWindow((x, y) => {
+                if (y > 0) {
+                  flatListRef.current?.scrollToOffset({ 
+                    offset: Math.max(0, y - 200), 
+                    animated: true 
+                  });
+                }
+              });
+            }
+            setHighlightComment(commentId);
+          }, 600);
+          
+          setTimeout(() => setHighlightComment(null), 3000);
+        }
+      }
+    }
+  }, [params, moments]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUnreadCount();
+    }, [])
+  );
+
+  const loadUnreadCount = async () => {
+    try {
+      const count = await getUnreadCount();
+      setUnreadCount(count);
+    } catch (e) {}
+  };
 
   const loadUserProfile = async () => {
     try {
@@ -69,13 +132,28 @@ export default function MomentsScreen() {
     setModalVisible(false);
 
     setTimeout(async () => {
-      if (moments.length > 0) {
+      await loadMoments();
+      const updatedMoments = useAppStore.getState().moments;
+      const newMomentId = updatedMoments[0]?.id;
+      
+      if (newMomentId) {
+        for (const ai of aiCharacters) {
+          if (Math.random() > 0.3) {
+            await likeMoment(newMomentId, ai.id);
+            await sendLocalNotification(
+              '收到点赞',
+              `${ai.name} 赞了你的朋友圈`,
+              { type: 'like' }
+            );
+          }
+        }
+        
         const randomAI = aiCharacters[Math.floor(Math.random() * aiCharacters.length)];
         if (randomAI) {
-          await aiCommentOnMoment(moments[0]?.id);
+          await aiCommentOnMoment(newMomentId, null, null, randomAI.id);
           await loadMoments();
           await sendLocalNotification(
-            '收到新评论',
+            '收到评论',
             `${randomAI.name} 评论了你的朋友圈`,
             { type: 'comment' }
           );
@@ -100,20 +178,6 @@ export default function MomentsScreen() {
     setTimeout(() => {
       setLikeAnimations(prev => ({ ...prev, [momentId]: false }));
     }, 1000);
-
-    const moment = moments.find(m => m.id === momentId);
-    if (moment && moment.author_type === 'ai') {
-      setTimeout(async () => {
-        const randomAI = aiCharacters[Math.floor(Math.random() * aiCharacters.length)];
-        if (randomAI && Math.random() > 0.5) {
-          await sendLocalNotification(
-            '收到点赞',
-            `${randomAI.name} 赞了你的朋友圈`,
-            { type: 'like' }
-          );
-        }
-      }, 1500);
-    }
   };
 
   const handleComment = async (momentId, text, parentId = null) => {
@@ -128,21 +192,21 @@ export default function MomentsScreen() {
     setTimeout(async () => {
       try {
         const updatedMoments = useAppStore.getState().moments;
-        const moment = updatedMoments.find(m => m.id === momentId);
+        const updatedMoment = updatedMoments.find(m => m.id === momentId);
         
         let replyAIId = null;
         let replyToCommentId = newCommentId;
         
         if (parentId) {
-          const parentComment = moment?.comments?.find(c => c.id === parentId);
+          const parentComment = updatedMoment?.comments?.find(c => c.id === parentId);
           if (parentComment && parentComment.author_type === 'ai') {
             replyAIId = parentComment.author_id;
             replyToCommentId = parentId;
           }
         }
         
-        if (!replyAIId && moment?.author_type === 'ai') {
-          replyAIId = moment.author_id;
+        if (!replyAIId && updatedMoment?.author_type === 'ai') {
+          replyAIId = updatedMoment.author_id;
         }
         
         if (!replyAIId && aiCharacters.length > 0) {
@@ -150,15 +214,15 @@ export default function MomentsScreen() {
         }
         
         if (replyAIId) {
-          await aiCommentOnMoment(momentId, replyToCommentId, userCommentText, replyAIId);
+          const aiReply = await aiCommentOnMoment(momentId, replyToCommentId, userCommentText, replyAIId);
           await loadMoments();
           
           const replyAI = aiCharacters.find(a => a.id === replyAIId);
           if (replyAI) {
             await sendLocalNotification(
-              '收到新评论',
+              '收到回复',
               `${replyAI.name} 回复了你`,
-              { type: 'comment' }
+              { type: 'reply', momentId: momentId, commentId: aiReply?.commentId }
             );
           }
         }
@@ -240,9 +304,14 @@ export default function MomentsScreen() {
 
   const renderNestedComment = (comment, isReply = false, replyTargetName = null) => {
     const isUser = comment.author_type === 'user';
+    const isHighlighted = highlightComment === comment.id;
     
     return (
-      <View key={comment.id} style={[styles.commentItem, isReply && styles.nestedComment]}>
+      <View 
+        key={comment.id} 
+        ref={el => commentRefs.current[comment.id] = el}
+        style={[styles.commentItem, isReply && styles.nestedComment, isHighlighted && styles.highlightedComment]}
+      >
         <View style={styles.commentRow}>
           {isUser ? (
             <SafeAvatar
@@ -497,9 +566,21 @@ export default function MomentsScreen() {
           <Ionicons name="sparkles" size={20} color="#4A90D9" />
           <Text style={styles.headerButtonText}>AI发朋友圈</Text>
         </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.notificationBtn} 
+          onPress={() => router.push('/notifications')}
+        >
+          <Ionicons name="mail-outline" size={24} color="#333" />
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <FlatList
+        ref={flatListRef}
         data={filteredMoments}
         renderItem={renderMoment}
         keyExtractor={(item) => item.id.toString()}
@@ -631,7 +712,8 @@ const styles = StyleSheet.create({
   },
   headerActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 12,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -646,6 +728,27 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     color: '#4A90D9',
     fontSize: 14,
+  },
+  notificationBtn: {
+    padding: 8,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#F56C6C',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   momentItem: {
     backgroundColor: '#fff',
@@ -744,6 +847,13 @@ const styles = StyleSheet.create({
   nestedComment: {
     marginLeft: 40,
     marginTop: 6,
+  },
+  highlightedComment: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    padding: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFC107',
   },
   commentRow: {
     flexDirection: 'row',

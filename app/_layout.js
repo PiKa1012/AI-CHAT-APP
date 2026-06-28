@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { getDatabase } from '../src/database';
 import { useAppStore } from '../src/stores';
 import { registerForPushNotifications, addNotificationListener, addNotificationResponseListener } from '../src/services/notification';
-import { startScheduler } from '../src/services/scheduler';
+import { startScheduler, executeScheduledTask } from '../src/services/scheduler';
 import { StatusBar } from 'expo-status-bar';
 import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -36,9 +36,14 @@ export default function RootLayout() {
     startScheduler();
 
     addNotificationListener(notification => {
+      console.log('通知收到:', notification);
     });
 
-    addNotificationResponseListener(response => {
+    addNotificationResponseListener(async (response) => {
+      const data = response.notification.request.content.data;
+      if (data?.taskId) {
+        await executeScheduledTask(data.taskId);
+      }
     });
     
     logInfo('App', '应用初始化完成');
@@ -71,7 +76,6 @@ export default function RootLayout() {
         <Stack.Screen name="voice-settings" options={{ title: '语音设置' }} />
         <Stack.Screen name="chat-history" options={{ title: '聊天记录搜索' }} />
         <Stack.Screen name="chat-detail-history" options={{ title: '聊天历史' }} />
-        <Stack.Screen name="auto-post-settings" options={{ title: '自动发布设置' }} />
         <Stack.Screen name="group-settings" options={{ title: '群聊设置' }} />
         <Stack.Screen name="log-viewer" options={{ title: '操作日志' }} />
         <Stack.Screen name="storage-manage" options={{ title: '存储管理' }} />
@@ -79,6 +83,7 @@ export default function RootLayout() {
         <Stack.Screen name="ai-mood" options={{ title: 'AI情绪' }} />
         <Stack.Screen name="ai-profile" options={{ title: 'AI资料' }} />
         <Stack.Screen name="memory-manage" options={{ title: '记忆管理' }} />
+        <Stack.Screen name="notifications" options={{ title: '通知中心' }} />
       </Stack>
     </View>
   );

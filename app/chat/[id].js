@@ -365,7 +365,8 @@ export default function ChatScreen() {
         const taskResult = await detectAndCreateTask(aiId, messageText);
         if (taskResult?.created) {
           const taskName = getTaskTypeName(taskResult.taskType);
-          await sendMessage(parseInt(id), 'ai', aiId, `好的，已设置每天${taskResult.scheduleTime}${taskName}~`);
+          const repeatText = taskResult.repeatType === 'once' ? '' : '每天';
+          await sendMessage(parseInt(id), 'ai', aiId, `好的，已设置${repeatText}${taskResult.scheduleTime}${taskName}~`);
           setIsTyping(false);
           return;
         }

@@ -82,16 +82,30 @@ export async function extractMemories(aiId, messages) {
       .map(m => `${m.sender_type === 'user' ? '用户' : 'AI'}：${m.content}`)
       .join('\n');
 
-    const prompt = `分析以下对话，提取关键信息。只输出JSON数组，每个元素包含type和content：
-- type: "fact"（事实，如姓名、年龄）/ "preference"（喜好）/ "event"（事件）
-- content: 简短描述
+    const prompt = `分析以下对话，提取关键信息并正确分类。
 
 对话：
 ${conversationText}
 
-示例输出：
-[{"type":"fact","content":"用户叫小明"},{"type":"preference","content":"用户喜欢看电影"}]
+分类规则（严格遵守）：
+- "fact"：用户的个人信息（姓名、年龄、职业、所在地等）
+- "preference"：用户的喜好、偏好（喜欢什么、讨厌什么、爱好等）
+- "event"：发生的具体事件、经历（去了哪里、做了什么、遇到什么事）
 
+示例：
+- "我叫小明" → fact
+- "我今年20岁" → fact
+- "我喜欢吃火锅" → preference
+- "我喜欢看电影" → preference
+- "我今天去了公园" → event
+- "我昨天考试了" → event
+- "定时任务" → 不提取，忽略
+- "提醒我吃饭" → 不提取，忽略
+
+只输出JSON数组，每个元素包含type和content：
+[{"type":"fact","content":"用户叫小明"},{"type":"preference","content":"用户喜欢吃火锅"}]
+
+如果对话中没有值得记忆的信息，输出空数组：[]
 只输出JSON，不要其他文字。`;
 
     const response = await callMemoryAPI(prompt, settings);

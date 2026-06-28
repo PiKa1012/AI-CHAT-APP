@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { executeQuery, executeInsert, executeUpdate } from '../database';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -44,6 +45,36 @@ export async function sendLocalNotification(title, body, data = {}) {
     },
     trigger: null,
   });
+
+  if (data.type === 'like' || data.type === 'comment' || data.type === 'reply') {
+    try {
+      await executeInsert(
+        'INSERT INTO notifications (title, body, type, data) VALUES (?, ?, ?, ?)',
+        [title, body, data.type, JSON.stringify(data)]
+      );
+    } catch (e) {}
+  }
+}
+
+export async function getUnreadCount() {
+  try {
+    const result = await executeQuery('SELECT COUNT(*) as count FROM notifications WHERE is_read = 0');
+    return result[0]?.count || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+export async function getAllNotifications() {
+  return await executeQuery('SELECT * FROM notifications ORDER BY created_at DESC LIMIT 100');
+}
+
+export async function markAllAsRead() {
+  await executeUpdate('UPDATE notifications SET is_read = 1');
+}
+
+export async function clearAllNotifications() {
+  await executeUpdate('DELETE FROM notifications');
 }
 
 export async function sendDelayedNotification(title, body, delaySeconds, data = {}) {
