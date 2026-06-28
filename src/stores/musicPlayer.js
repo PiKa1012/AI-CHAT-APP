@@ -5,6 +5,20 @@ import { saveSetting, loadSetting } from '../services/settings';
 let sound = null;
 let isPlayingLock = false;
 
+function getNextIndex(queue, currentIndex, playMode) {
+  if (queue.length === 0) return -1;
+  if (playMode === 'shuffle') {
+    if (queue.length === 1) return 0;
+    let next = currentIndex;
+    while (next === currentIndex) {
+      next = Math.floor(Math.random() * queue.length);
+    }
+    return next;
+  }
+  if (currentIndex < queue.length - 1) return currentIndex + 1;
+  return -1;
+}
+
 export const useMusicPlayer = create((set, get) => ({
   queue: [],
   currentIndex: -1,
@@ -14,16 +28,17 @@ export const useMusicPlayer = create((set, get) => ({
   isLoading: false,
   positionMs: 0,
   durationMs: 0,
+  playMode: 'order',
 
   persistQueue: async () => {
-    const { queue, currentIndex } = get();
-    await saveSetting('music_queue', { queue, currentIndex });
+    const { queue, currentIndex, playMode } = get();
+    await saveSetting('music_queue', { queue, currentIndex, playMode });
   },
 
   restoreQueue: async () => {
     const data = await loadSetting('music_queue', null);
     if (data && data.queue && data.queue.length > 0) {
-      set({ queue: data.queue, currentIndex: data.currentIndex ?? -1, isVisible: true });
+      set({ queue: data.queue, currentIndex: data.currentIndex ?? -1, playMode: data.playMode || 'order', isVisible: true });
     }
   },
 
@@ -59,7 +74,13 @@ export const useMusicPlayer = create((set, get) => ({
           isPlaying: status.isPlaying,
         });
         if (status.didJustFinish) {
-          get().next();
+          const { playMode } = get();
+          if (playMode === 'loop') {
+            sound?.setPositionAsync(0);
+            sound?.playAsync();
+          } else {
+            get().next();
+          }
         }
       });
 
@@ -114,9 +135,10 @@ export const useMusicPlayer = create((set, get) => ({
   },
 
   next: async () => {
-    const { queue, currentIndex } = get();
-    if (currentIndex < queue.length - 1) {
-      await get().playFromIndex(currentIndex + 1);
+    const { queue, currentIndex, playMode } = get();
+    const nextIndex = getNextIndex(queue, currentIndex, playMode);
+    if (nextIndex >= 0) {
+      await get().playFromIndex(nextIndex);
     }
   },
 
@@ -148,8 +170,13 @@ export const useMusicPlayer = create((set, get) => ({
 
   setExpanded: (expanded) => set({ isExpanded: expanded }),
   setVisible: (visible) => set({ isVisible: visible }),
+  setPlayMode: (mode) => {
+    set({ playMode: mode });
+    get().persistQueue();
+  },
 
-  hide: () => {
-    set({ isVisible: false, isExpanded: false });
+  hide: async () => {
+    await get().cleanup();
+    set({ isVisible: false, isExpanded: false, isPlaying: false, positionMs: 0, durationMs: 0 });
   },
 }));

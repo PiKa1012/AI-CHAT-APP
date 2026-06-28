@@ -34,6 +34,8 @@ export default function MusicPlayer() {
   const seekTo = useMusicPlayer(s => s.seekTo);
   const playSong = useMusicPlayer(s => s.playSong);
   const removeFromQueue = useMusicPlayer(s => s.removeFromQueue);
+  const playMode = useMusicPlayer(s => s.playMode);
+  const setPlayMode = useMusicPlayer(s => s.setPlayMode);
 
   const currentSong = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
 
@@ -155,6 +157,19 @@ export default function MusicPlayer() {
                 </TouchableOpacity>
                 <TouchableOpacity onPress={next} style={styles.controlBtn}>
                   <Ionicons name="play-skip-forward" size={28} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modeRow}>
+                <TouchableOpacity style={styles.modeBtn} onPress={() => setPlayMode(playMode === 'order' ? 'shuffle' : playMode === 'shuffle' ? 'loop' : 'order')}>
+                  <Ionicons
+                    name={playMode === 'shuffle' ? 'shuffle' : playMode === 'loop' ? 'repeat' : 'list-outline'}
+                    size={22}
+                    color={playMode === 'order' ? '#999' : '#4A90D9'}
+                  />
+                  <Text style={[styles.modeLabel, playMode !== 'order' && styles.modeLabelActive]}>
+                    {playMode === 'shuffle' ? '随机播放' : playMode === 'loop' ? '单曲循环' : '顺序播放'}
+                  </Text>
                 </TouchableOpacity>
               </View>
 
@@ -326,6 +341,27 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(74,144,217,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  modeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f5f5f5',
+    gap: 6,
+  },
+  modeLabel: {
+    fontSize: 13,
+    color: '#999',
+  },
+  modeLabelActive: {
+    color: '#4A90D9',
   },
   playlistSection: {
     marginTop: 24,
