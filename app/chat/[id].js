@@ -25,6 +25,7 @@ export default function ChatScreen() {
   const navigation = useNavigation();
   const messages = useAppStore(s => s.messages);
   const loadMessages = useAppStore(s => s.loadMessages);
+  const loadMoreMessages = useAppStore(s => s.loadMoreMessages);
   const sendMessage = useAppStore(s => s.sendMessage);
   const conversations = useAppStore(s => s.conversations);
   const loadConversations = useAppStore(s => s.loadConversations);

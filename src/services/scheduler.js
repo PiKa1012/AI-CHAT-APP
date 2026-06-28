@@ -11,15 +11,18 @@ import * as Notifications from 'expo-notifications';
 let schedulerInterval = null;
 let lastAutoPostCheck = null;
 let lastAutoDiaryCheck = null;
+const executedTaskIds = new Set();
 
 export function startScheduler() {
   if (schedulerInterval) return;
 
   schedulerInterval = setInterval(async () => {
     await checkAutoPostSettings();
+    await checkDueScheduledTasks();
   }, 60000);
 
   checkAutoPostSettings();
+  checkDueScheduledTasks();
   syncScheduledTasksToNotifications();
 }
 
@@ -32,11 +35,18 @@ export function stopScheduler() {
 
 export async function syncScheduledTasksToNotifications() {
   try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of scheduled) {
+      if (notification.identifier.startsWith('scheduled_task_')) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
 
     const tasks = await executeQuery('SELECT * FROM scheduled_tasks WHERE is_active = 1');
     
     for (const task of tasks) {
+      if (!task.schedule_time || !task.schedule_time.includes(':')) continue;
+
       const [hours, minutes] = task.schedule_time.split(':').map(Number);
       
       let taskName = '';
@@ -49,6 +59,7 @@ export async function syncScheduledTasksToNotifications() {
       }
 
       await Notifications.scheduleNotificationAsync({
+        identifier: `scheduled_task_${task.id}`,
         content: {
           title: '定时任务',
           body: taskName,
@@ -87,6 +98,40 @@ async function getAutoPostSettings() {
   };
 }
 
+async function checkDueScheduledTasks() {
+  try {
+    if (executedTaskIds.size > 1000) {
+      executedTaskIds.clear();
+    }
+
+    const now = getBeijingNow();
+    const currentTime = `${now.hours.toString().padStart(2, '0')}:${now.minutes.toString().padStart(2, '0')}`;
+    const today = `${now.year}-${now.month.toString().padStart(2, '0')}-${now.day.toString().padStart(2, '0')}`;
+
+    const tasks = await executeQuery('SELECT * FROM scheduled_tasks WHERE is_active = 1');
+
+    for (const task of tasks) {
+      const taskKey = `${task.id}_${today}`;
+      if (executedTaskIds.has(taskKey)) continue;
+
+      if (task.schedule_time !== currentTime) continue;
+
+      if (task.repeat_type === 'once' && task.execute_date !== today) continue;
+
+      executedTaskIds.add(taskKey);
+      await executeTask(task);
+
+      if (task.repeat_type === 'once') {
+        await executeUpdate('UPDATE scheduled_tasks SET is_active = 0, executed_count = executed_count + 1 WHERE id = ?', [task.id]);
+      } else {
+        await executeUpdate('UPDATE scheduled_tasks SET executed_count = executed_count + 1 WHERE id = ?', [task.id]);
+      }
+    }
+  } catch (error) {
+    console.error('检查定时任务失败:', error);
+  }
+}
+
 async function checkAutoPostSettings() {
   const settings = await getAutoPostSettings();
   const now = getBeijingNow();
@@ -120,6 +165,12 @@ async function checkAutoPostSettings() {
 }
 
 export async function executeScheduledTask(taskId) {
+  const now = getBeijingNow();
+  const today = `${now.year}-${now.month.toString().padStart(2, '0')}-${now.day.toString().padStart(2, '0')}`;
+  const taskKey = `${taskId}_${today}`;
+  if (executedTaskIds.has(taskKey)) return;
+  executedTaskIds.add(taskKey);
+
   const tasks = await executeQuery('SELECT * FROM scheduled_tasks WHERE id = ? AND is_active = 1', [taskId]);
   if (tasks.length === 0) return;
 
@@ -140,12 +191,6 @@ async function autoPostMoment() {
 
     const randomAI = ais[Math.floor(Math.random() * ais.length)];
     await aiAutoPostMoment(randomAI.id);
-
-    await sendLocalNotification(
-      '朋友圈更新',
-      `${randomAI.name} 发了一条新朋友圈`,
-      { type: 'moment', aiId: randomAI.id }
-    );
   } catch (error) {
     console.error('发朋友圈失败:', error.message || error);
   }
@@ -210,12 +255,6 @@ async function executePostMoment(task) {
     }
 
     await aiAutoPostMoment(ai.id);
-
-    await sendLocalNotification(
-      '朋友圈更新',
-      `${ai.name} 发了一条新朋友圈`,
-      { type: 'moment', aiId: ai.id }
-    );
   } catch (error) {
     console.error('发朋友圈任务失败:', error.message || error);
   }

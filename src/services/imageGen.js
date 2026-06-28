@@ -51,32 +51,15 @@ export async function generateAndSaveImage(prompt, folder = 'generated') {
   try {
     const imageUrl = await generateImage(prompt);
     
-    const response = await fetch(imageUrl);
-    const blob = await response.blob();
+    const fileName = `${folder}_${Date.now()}.jpg`;
+    const dirPath = `${FileSystem.documentDirectory}${folder}/`;
     
-    const reader = new FileReader();
-    return new Promise((resolve, reject) => {
-      reader.onload = async () => {
-        try {
-          const base64 = reader.result.split(',')[1];
-          const fileName = `${folder}_${Date.now()}.jpg`;
-          const dirPath = `${FileSystem.documentDirectory}${folder}/`;
-          
-          await FileSystem.makeDirectoryAsync(dirPath, { intermediates: true });
-          
-          const filePath = `${dirPath}${fileName}`;
-          await FileSystem.writeAsStringAsync(filePath, base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          
-          resolve(filePath);
-        } catch (e) {
-          reject(e);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    await FileSystem.makeDirectoryAsync(dirPath, { intermediates: true });
+    
+    const filePath = `${dirPath}${fileName}`;
+    await FileSystem.downloadAsync(imageUrl, filePath);
+    
+    return filePath;
   } catch (error) {
     console.error('生成并保存图片失败:', error);
     throw error;
@@ -85,17 +68,17 @@ export async function generateAndSaveImage(prompt, folder = 'generated') {
 
 export async function generateMomentImage(content) {
   const prompt = `根据以下内容生成一张适合发朋友圈的配图，风格清新自然：${content}`;
-  return await generateAndSaveImage(prompt, 'moments');
+  return await generateAndSaveImage(prompt, 'generated');
 }
 
 export async function generateDiaryImage(title, content) {
   const prompt = `根据以下日记内容生成一张配图，风格温馨治愈：标题"${title}"，内容"${content.substring(0, 100)}"`;
-  return await generateAndSaveImage(prompt, 'diaries');
+  return await generateAndSaveImage(prompt, 'generated');
 }
 
 export async function generateChatImage(description) {
   const prompt = description;
-  return await generateAndSaveImage(prompt, 'chat_images');
+  return await generateAndSaveImage(prompt, 'generated');
 }
 
 export function isImageGenerationRequest(text) {

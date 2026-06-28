@@ -6,6 +6,7 @@ import { getAIMood, analyzeAndUpdateMood, getMoodPrompt, decayMood } from './emo
 import { getAPISettings, clearAPISettingsCache, loadSetting } from './settings';
 import { getRelevantMemories, formatMemoriesForPrompt, extractMemories } from './memory';
 import { generateMomentImage } from './imageGen';
+import { sendLocalNotification } from './notification';
 
 export { clearAPISettingsCache as clearSettingsCache };
 
@@ -322,6 +323,10 @@ export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
   const currentMood = await getAIMood(aiId);
   const moodPrompt = getMoodPrompt(aiId, currentMood);
 
+  const lastMessage = recentMessages[recentMessages.length - 1];
+  const relevantMemories = await getRelevantMemories(aiId, lastMessage?.content || '', 10);
+  const memoryContext = formatMemoriesForPrompt(relevantMemories);
+
   const otherMembers = allMembers.filter(m => m.id !== aiId);
   const memberNames = otherMembers.map(m => m.name).join('、');
   
@@ -341,6 +346,7 @@ export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
 
   const systemPrompt = getPersonalityPrompt(character) + 
     `\n${moodPrompt}` +
+    `\n${memoryContext}` +
     `\n你是${character.name}，在一个群聊中。` +
     `\n群里的其他成员：${memberNames}` +
     `\n用户是发消息的人，不是群成员。` +
@@ -348,12 +354,47 @@ export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
     `\n${chatHistory}` +
     `\n根据聊天内容自然地参与对话。只输出你要说的话，不要其他解释。`;
 
-  const lastMessage = recentMessages[recentMessages.length - 1];
-  const userMessage = `继续聊天`;
+  const userMessage = '继续聊天';
 
   const messages = [{ role: 'user', content: userMessage }];
   
   let apiResponse = await callAIAPI(messages, systemPrompt);
+
+  const settings = await getAPISettings();
+  if (settings?.apiKey) {
+    try {
+      const summaryPrompt = `分析这段对话，提取关键信息并分类。
+
+用户：${lastMessage?.content || ''}
+AI：${apiResponse}
+
+分类规则：
+- fact：用户个人信息（姓名、年龄、职业等）
+- preference：用户喜好（喜欢什么、讨厌什么）
+- event：发生的具体事件
+
+输出JSON格式：
+{"type":"分类","content":"总结内容"}
+
+如果没什么值得记住的，输出：{"type":"none","content":""}
+
+只输出JSON，不要其他文字。`;
+      
+      const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '');
+      
+      try {
+        const parsed = JSON.parse(result);
+        if (parsed.type && parsed.type !== 'none' && parsed.content) {
+          await executeInsert(
+            'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
+            [aiId, parsed.type, parsed.content, 5]
+          );
+        }
+      } catch (e) {}
+    } catch (e) {
+      console.error('保存群聊记忆失败:', e);
+    }
+  }
 
   await analyzeAndUpdateMood(aiId, lastMessage?.content || '', apiResponse);
   const updatedMood = await getAIMood(aiId);
@@ -415,7 +456,33 @@ export async function aiAutoPostMoment(aiId) {
   }
 
   const store = useAppStore.getState();
-  await store.addMoment('ai', aiId, content, images);
+  const momentId = await store.addMoment('ai', aiId, content, images);
+
+  const otherAIs = await executeQuery('SELECT * FROM ai_characters WHERE is_active = 1 AND id != ?', [aiId]);
+  for (const other of otherAIs) {
+    if (Math.random() > 0.3) {
+      await store.likeMoment(momentId, other.id);
+    }
+  }
+
+  if (otherAIs.length > 0) {
+    const randomAI = otherAIs[Math.floor(Math.random() * otherAIs.length)];
+    try {
+      const commentResult = await aiCommentOnMoment(momentId, null, null, randomAI.id);
+      if (commentResult && Math.random() > 0.5) {
+        await aiCommentOnMoment(momentId, commentResult.commentId, commentResult.text, aiId);
+      }
+    } catch (e) {
+      console.error('AI评论失败:', e.message || e);
+    }
+  }
+
+  await sendLocalNotification(
+    '朋友圈更新',
+    `${ai[0].name} 发了一条新朋友圈`,
+    { type: 'moment', aiId: ai[0].id }
+  );
+
   return content;
 }
 

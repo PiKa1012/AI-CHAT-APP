@@ -158,6 +158,8 @@ export default function MomentsScreen() {
             { type: 'comment' }
           );
         }
+
+        loadUnreadCount();
       }
     }, 2000);
   };
@@ -224,6 +226,7 @@ export default function MomentsScreen() {
               `${replyAI.name} 回复了你`,
               { type: 'reply', momentId: momentId, commentId: aiReply?.commentId }
             );
+            loadUnreadCount();
           }
         }
       } catch (error) {
@@ -266,12 +269,15 @@ export default function MomentsScreen() {
     return rootComments;
   };
 
-  const getAllReplies = (parentId, comments) => {
+  const getAllReplies = (parentId, comments, depth = 0, visited = new Set()) => {
+    if (depth > 20 || visited.has(parentId)) return [];
+    visited.add(parentId);
+
     const directReplies = comments.filter(c => c.parent_id === parentId);
     let allReplies = [...directReplies];
     
     directReplies.forEach(reply => {
-      const subReplies = getAllReplies(reply.id, comments);
+      const subReplies = getAllReplies(reply.id, comments, depth + 1, visited);
       allReplies = [...allReplies, ...subReplies];
     });
     

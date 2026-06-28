@@ -44,7 +44,9 @@ async function saveLog(level, tag, message, data = null) {
 
     await AsyncStorage.setItem(LOG_KEY, JSON.stringify(logs));
   } catch (e) {
-    console.error('Failed to save log:', e);
+    if (originalConsoleError) {
+      originalConsoleError('Failed to save log:', e);
+    }
   }
 }
 
@@ -58,7 +60,9 @@ export async function logWarn(tag, message, data) {
 
 export async function logError(tag, message, data) {
   await saveLog(LOG_LEVELS.ERROR, tag, message, data);
-  console.error(`[${tag}] ${message}`, data);
+  if (originalConsoleError) {
+    originalConsoleError(`[${tag}] ${message}`, data);
+  }
 }
 
 export async function logDebug(tag, message, data) {
@@ -75,8 +79,10 @@ export async function getAllLogs() {
   return await getLogs();
 }
 
+let originalConsoleError = console.error;
+
 export function setupGlobalErrorHandler() {
-  const originalConsoleError = console.error;
+  originalConsoleError = console.error;
   console.error = (...args) => {
     originalConsoleError.apply(console, args);
     const message = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');

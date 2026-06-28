@@ -88,6 +88,14 @@ export default function ScheduledTasksScreen() {
       Alert.alert('提示', '请选择群聊');
       return;
     }
+    if (newTask.repeat_type === 'once' && !newTask.execute_date) {
+      Alert.alert('提示', '请选择执行日期');
+      return;
+    }
+    if (!/^\d{2}:\d{2}$/.test(newTask.schedule_time)) {
+      Alert.alert('提示', '请选择有效的执行时间');
+      return;
+    }
     await addScheduledTask(newTask);
     await syncScheduledTasksToNotifications();
     setNewTask({ ai_id: null, task_type: 'post_moment', content: '', schedule_time: '08:00', repeat_type: 'daily', execute_date: '' });

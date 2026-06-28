@@ -98,6 +98,7 @@ async function initDatabase(database) {
       content TEXT NOT NULL,
       importance INTEGER DEFAULT 5,
       context TEXT,
+      last_accessed DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (ai_id) REFERENCES ai_characters(id)
     );

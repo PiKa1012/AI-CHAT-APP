@@ -10,6 +10,7 @@ const STORAGE_FOLDERS = [
   { id: 'emojis', name: '表情包', icon: 'happy', color: '#E6A23C' },
   { id: 'backgrounds', name: '聊天背景', icon: 'image', color: '#67C23A' },
   { id: 'chat_images', name: '聊天图片', icon: 'images', color: '#9B59B6' },
+  { id: 'generated', name: 'AI生成缓存', icon: 'sparkles', color: '#FF6B6B' },
 ];
 
 export default function StorageManageScreen() {
@@ -17,6 +18,7 @@ export default function StorageManageScreen() {
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [files, setFiles] = useState([]);
   const [totalSize, setTotalSize] = useState(0);
+  const [dbSize, setDbSize] = useState(0);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
   const [dbInfo, setDbInfo] = useState(null);
@@ -79,6 +81,21 @@ export default function StorageManageScreen() {
         info.push({ ...folder, count: 0, size: 0 });
       }
     }
+
+    // 计算 SQLite 数据库文件大小
+    let dbTotalSize = 0;
+    const dbFiles = ['ai_companion.db', 'ai_companion.db-wal', 'ai_companion.db-shm'];
+    for (const dbFile of dbFiles) {
+      try {
+        const dbPath = `${FileSystem.documentDirectory}SQLite/${dbFile}`;
+        const dbInfo = await FileSystem.getInfoAsync(dbPath);
+        if (dbInfo.exists) {
+          dbTotalSize += dbInfo.size || 0;
+        }
+      } catch (e) {}
+    }
+    setDbSize(dbTotalSize);
+    total += dbTotalSize;
 
     setStorageInfo(info);
     setTotalSize(total);
@@ -373,8 +390,18 @@ export default function StorageManageScreen() {
         <View style={styles.totalSection}>
           <Ionicons name="folder" size={32} color="#4A90D9" />
           <View style={styles.totalInfo}>
-            <Text style={styles.totalLabel}>文件占用空间</Text>
+            <Text style={styles.totalLabel}>总占用空间</Text>
             <Text style={styles.totalSize}>{formatSize(totalSize)}</Text>
+          </View>
+        </View>
+        <View style={styles.breakdownSection}>
+          <View style={styles.breakdownItem}>
+            <Text style={styles.breakdownLabel}>图片及缓存</Text>
+            <Text style={styles.breakdownValue}>{formatSize(totalSize - dbSize)}</Text>
+          </View>
+          <View style={styles.breakdownItem}>
+            <Text style={styles.breakdownLabel}>数据库（消息/日记等）</Text>
+            <Text style={styles.breakdownValue}>{formatSize(dbSize)}</Text>
           </View>
         </View>
 
@@ -573,6 +600,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginTop: 4,
+  },
+  breakdownSection: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginHorizontal: 12,
+    marginBottom: 12,
+    marginTop: -8,
+    borderRadius: 12,
+    padding: 16,
+    gap: 16,
+  },
+  breakdownItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  breakdownLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 6,
+  },
+  breakdownValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
   },
   dbSection: {
     backgroundColor: '#fff',

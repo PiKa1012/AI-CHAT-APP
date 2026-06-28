@@ -46,13 +46,16 @@ export async function sendLocalNotification(title, body, data = {}) {
     trigger: null,
   });
 
-  if (data.type === 'like' || data.type === 'comment' || data.type === 'reply') {
+  const persistableTypes = ['like', 'comment', 'reply', 'moment', 'diary', 'group_chat', 'message'];
+  if (persistableTypes.includes(data.type)) {
     try {
       await executeInsert(
         'INSERT INTO notifications (title, body, type, data) VALUES (?, ?, ?, ?)',
         [title, body, data.type, JSON.stringify(data)]
       );
-    } catch (e) {}
+    } catch (e) {
+      console.warn('保存通知失败:', e);
+    }
   }
 }
 
