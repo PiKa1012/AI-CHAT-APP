@@ -21,6 +21,7 @@ export default function MomentsScreen() {
   const addMoment = useAppStore(s => s.addMoment);
   const commentOnMoment = useAppStore(s => s.commentOnMoment);
   const deleteComment = useAppStore(s => s.deleteComment);
+  const deleteMoment = useAppStore(s => s.deleteMoment);
   const likeMoment = useAppStore(s => s.likeMoment);
   const aiCharacters = useAppStore(s => s.aiCharacters);
   const [modalVisible, setModalVisible] = useState(false);
@@ -220,6 +221,11 @@ export default function MomentsScreen() {
             <View style={styles.momentFooter}>
               <Text style={styles.momentTime}>{formatDateTime(item.created_at)}</Text>
               <View style={styles.momentActions}>
+                {isUser && (
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteMoment(item.id)}>
+                    <Ionicons name="trash-outline" size={16} color="#F56C6C" />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(item.id)}>
                   <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? '#F56C6C' : '#999'} />
                   {item.likes?.length > 0 && <Text style={[styles.actionText, isLiked && { color: '#F56C6C' }]}>{item.likes.length}</Text>}
@@ -287,6 +293,13 @@ export default function MomentsScreen() {
     let allReplies = [...directReplies];
     directReplies.forEach(reply => { allReplies = [...allReplies, ...getAllReplies(reply.id, comments, depth + 1, visited)]; });
     return allReplies;
+  };
+
+  const handleDeleteMoment = (momentId) => {
+    Alert.alert('删除动态', '确定要删除这条动态吗？删除后无法恢复。', [
+      { text: '取消', style: 'cancel' },
+      { text: '删除', style: 'destructive', onPress: async () => { await deleteMoment(momentId); } },
+    ]);
   };
 
   const handleDeleteComment = (commentId) => {

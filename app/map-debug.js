@@ -1,6 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
+import { useNavigation } from 'expo-router';
 import { loadSetting } from '../src/services/settings';
 import { detectMapIntent, searchNearby, searchByKeyword, getWeather, getAddressFromLocation, getLocationFromAddress, getCurrentLocation, extractCity, extractLocation, getRoute } from '../src/services/map';
 
@@ -10,9 +11,23 @@ export default function MapDebugScreen() {
   const [loading, setLoading] = useState(false);
   const [amapKey, setAmapKey] = useState('');
 
+  const navigation = useNavigation();
+
   useEffect(() => {
     loadSetting('api_settings', {}).then(s => setAmapKey(s.amapApiKey || ''));
   }, []);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        amapKey ? (
+          <Text style={{ fontSize: 12, color: '#67C23A', backgroundColor: '#67C23A15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginRight: 12 }}>密钥已配置</Text>
+        ) : (
+          <Text style={{ fontSize: 12, color: '#F56C6C', backgroundColor: '#F56C6C15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginRight: 12 }}>未配置密钥</Text>
+        )
+      ),
+    });
+  }, [amapKey, navigation]);
 
   const addLog = (label, data) => {
     const entry = `[${new Date().toLocaleTimeString()}] ${label}:\n${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}`;
@@ -156,16 +171,6 @@ export default function MapDebugScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Ionicons name="map" size={24} color="#4A90D9" />
-        <Text style={styles.title}>地图接口调试</Text>
-        {amapKey ? (
-          <Text style={styles.keyBadge}>密钥已配置</Text>
-        ) : (
-          <Text style={styles.keyBadgeWarn}>未配置密钥</Text>
-        )}
-      </View>
-
       <View style={styles.section}>
         <Text style={styles.label}>测试查询语句</Text>
         <TextInput

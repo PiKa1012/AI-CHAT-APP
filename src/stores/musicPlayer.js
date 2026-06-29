@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Audio } from 'expo-av';
 import { saveSetting, loadSetting } from '../services/settings';
+import { getSongUrl } from '../services/netease';
 
 let sound = null;
 let isPlayingLock = false;
@@ -59,35 +60,57 @@ export const useMusicPlayer = create((set, get) => ({
     set({ currentIndex: index, isLoading: true });
     await get().cleanup();
 
-    try {
-      const result = await Audio.Sound.createAsync(
-        { uri: song.url },
-        { shouldPlay: true, progressUpdateIntervalMillis: 500 }
-      );
-      sound = result.sound;
+    let url = song.url;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await Audio.Sound.createAsync(
+          { uri: url },
+          { shouldPlay: true, progressUpdateIntervalMillis: 500 }
+        );
+        sound = result.sound;
 
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded) return;
-        set({
-          positionMs: status.positionMillis,
-          durationMs: status.durationMillis || 0,
-          isPlaying: status.isPlaying,
+        sound.setOnPlaybackStatusUpdate((status) => {
+          if (!status.isLoaded) return;
+          set({
+            positionMs: status.positionMillis,
+            durationMs: status.durationMillis || 0,
+            isPlaying: status.isPlaying,
+          });
+          if (status.didJustFinish) {
+            const { playMode } = get();
+            if (playMode === 'loop') {
+              sound?.setPositionAsync(0);
+              sound?.playAsync();
+            } else {
+              get().next();
+            }
+          }
         });
-        if (status.didJustFinish) {
-          const { playMode } = get();
-          if (playMode === 'loop') {
-            sound?.setPositionAsync(0);
-            sound?.playAsync();
-          } else {
-            get().next();
+
+        if (url !== song.url) {
+          const { queue } = get();
+          const updatedQueue = [...queue];
+          if (updatedQueue[index]) {
+            updatedQueue[index] = { ...updatedQueue[index], url };
+            set({ queue: updatedQueue });
           }
         }
-      });
 
-      set({ isPlaying: true, isLoading: false, isVisible: true });
-    } catch (e) {
-      console.error('播放失败:', e);
-      set({ isLoading: false });
+        set({ isPlaying: true, isLoading: false, isVisible: true });
+        return;
+      } catch (e) {
+        if (attempt === 0) {
+          const newUrl = await getSongUrl(song.id);
+          if (newUrl && newUrl !== url) {
+            url = newUrl;
+            await get().cleanup();
+            continue;
+          }
+        }
+        console.error('播放失败:', e);
+        set({ isLoading: false });
+        return;
+      }
     }
   },
 
@@ -160,7 +183,7 @@ export const useMusicPlayer = create((set, get) => ({
     const newQueue = queue.filter((_, i) => i !== index);
     set({ queue: newQueue });
     if (index === currentIndex) {
-      get().cleanup();
+      await get().cleanup();
       set({ currentIndex: -1, isPlaying: false, isVisible: newQueue.length > 0 });
     } else if (index < currentIndex) {
       set({ currentIndex: currentIndex - 1 });
@@ -170,9 +193,9 @@ export const useMusicPlayer = create((set, get) => ({
 
   setExpanded: (expanded) => set({ isExpanded: expanded }),
   setVisible: (visible) => set({ isVisible: visible }),
-  setPlayMode: (mode) => {
+  setPlayMode: async (mode) => {
     set({ playMode: mode });
-    get().persistQueue();
+    await get().persistQueue();
   },
 
   hide: async () => {
