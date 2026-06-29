@@ -1,5 +1,6 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { getAPISettings } from './settings';
+import { trackUsage } from './usage';
 
 const EMOTIONS = {
   happy: { name: '开心', emoji: '😊', valence: 1 },
@@ -140,8 +141,19 @@ ${name}：${aiResponse}
     if (!response.ok) return null;
 
     const data = await response.json();
+    if (data.usage) {
+      trackUsage({
+        promptTokens: data.usage.prompt_tokens,
+        completionTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens,
+        model,
+        provider: settings.provider || 'unknown',
+        endpoint: 'emotion',
+      });
+    }
     const content = data.choices?.[0]?.message?.content;
-    
+    if (!content) return null;
+
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);

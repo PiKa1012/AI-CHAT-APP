@@ -3,6 +3,7 @@ import { useAppStore } from '../stores';
 import { sendLocalNotification } from './notification';
 import { formatTime, getBeijingNow } from '../utils/time';
 import { getAPISettings } from './settings';
+import { trackUsage } from './usage';
 
 async function callAIAPI(messages, systemPrompt = '') {
   const settings = await getAPISettings();
@@ -31,6 +32,16 @@ async function callAIAPI(messages, systemPrompt = '') {
   }
 
   const data = await response.json();
+  if (data.usage) {
+    trackUsage({
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+      model,
+      provider: settings.provider || 'unknown',
+      endpoint: 'proactive',
+    });
+  }
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('API返回数据格式错误');
   return content;
