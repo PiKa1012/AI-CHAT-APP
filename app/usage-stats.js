@@ -114,7 +114,7 @@ export default function UsageStatsScreen() {
 
         <View style={styles.costRow}>
           <Text style={styles.costText}>费用 ¥{todayStats.cost.amount}</Text>
-          <Text style={styles.costHint}>（DeepSeek V4 Flash 定价）</Text>
+          <Text style={styles.costHint}>（DeepSeek V4 定价）</Text>
         </View>
         <View style={styles.providerRow}>
           <Text style={styles.providerText}>调用 {todayStats.calls} 次 · 服务商 {stats.provider}</Text>

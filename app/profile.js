@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, Image, ScrollView } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useCallback } from 'react';
@@ -10,6 +10,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [userName, setUserName] = useState('');
   const [userAvatar, setUserAvatar] = useState(null);
+  const [userBio, setUserBio] = useState('');
+  const [coverBg, setCoverBg] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -23,6 +25,8 @@ export default function ProfileScreen() {
       if (data) {
         setUserName(data.name || '');
         setUserAvatar(data.avatar || null);
+        setUserBio(data.bio || '');
+        setCoverBg(data.coverBg || null);
       }
     } catch (e) {}
   };
@@ -36,6 +40,8 @@ export default function ProfileScreen() {
       await saveSetting('user_profile', {
         name: userName.trim(),
         avatar: userAvatar,
+        bio: userBio.trim(),
+        coverBg: coverBg,
       });
       Alert.alert('成功', '资料已保存');
     } catch (e) {
@@ -58,6 +64,19 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickCoverBg = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const tempUri = result.assets[0].uri;
+      const permanentUri = await copyToAppStorage(tempUri, 'covers');
+      setCoverBg(permanentUri || tempUri);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.avatarSection}>
@@ -76,6 +95,29 @@ export default function ProfileScreen() {
         <Text style={styles.avatarHint}>点击更换头像</Text>
       </View>
 
+      <TouchableOpacity style={styles.momentsEntry} onPress={() => router.push({ pathname: '/(tabs)/moments', params: { filterAuthor: 'user' } })}>
+        <Ionicons name="images" size={22} color="#4A90D9" />
+        <Text style={styles.momentsEntryText}>我的朋友圈</Text>
+        <Ionicons name="chevron-forward" size={18} color="#ccc" />
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.coverPicker} onPress={pickCoverBg}>
+        <View style={styles.coverPreview}>
+          {coverBg ? (
+            <Image source={{ uri: coverBg }} style={styles.coverPreviewImage} />
+          ) : (
+            <View style={styles.coverPreviewPlaceholder}>
+              <Ionicons name="image" size={24} color="#4A90D9" />
+            </View>
+          )}
+        </View>
+        <View style={styles.coverPickerInfo}>
+          <Text style={styles.coverPickerTitle}>朋友圈背景</Text>
+          <Text style={styles.coverPickerHint}>点击更换封面背景</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="#ccc" />
+      </TouchableOpacity>
+
       <View style={styles.section}>
         <Text style={styles.label}>昵称</Text>
         <TextInput
@@ -83,6 +125,17 @@ export default function ProfileScreen() {
           value={userName}
           onChangeText={setUserName}
           placeholder="输入你的昵称"
+          placeholderTextColor="#999"
+        />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>个性签名</Text>
+        <TextInput
+          style={styles.input}
+          value={userBio}
+          onChangeText={setUserBio}
+          placeholder="这个人很懒，什么都没写"
           placeholderTextColor="#999"
         />
       </View>
@@ -137,6 +190,58 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#999',
+  },
+  momentsEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    marginTop: 12,
+    gap: 10,
+  },
+  momentsEntryText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  coverPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    marginTop: 12,
+    gap: 12,
+  },
+  coverPreview: {
+    width: 60,
+    height: 40,
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: '#e8e8e8',
+  },
+  coverPreviewImage: {
+    width: 60,
+    height: 40,
+    resizeMode: 'cover',
+  },
+  coverPreviewPlaceholder: {
+    width: 60,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverPickerInfo: {
+    flex: 1,
+  },
+  coverPickerTitle: {
+    fontSize: 15,
+    color: '#333',
+    fontWeight: '500',
+  },
+  coverPickerHint: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   section: {
     backgroundColor: '#fff',

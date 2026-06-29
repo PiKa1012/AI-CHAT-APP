@@ -85,6 +85,9 @@ export default function RootLayout() {
         <Stack.Screen name="ai-profile" options={{ title: 'AI资料' }} />
         <Stack.Screen name="memory-manage" options={{ title: '记忆管理' }} />
         <Stack.Screen name="notifications" options={{ title: '通知中心' }} />
+        <Stack.Screen name="moment-detail" options={{ title: '动态详情' }} />
+        <Stack.Screen name="map-debug" options={{ title: '地图调试', headerShown: false }} />
+        <Stack.Screen name="usage-stats" options={{ title: 'API用量' }} />
       </Stack>
       <MusicPlayer />
     </View>

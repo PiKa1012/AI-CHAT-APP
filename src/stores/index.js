@@ -18,16 +18,18 @@ export const useAppStore = create((set, get) => ({
   },
 
   addAICharacter: async (character) => {
+    const maxIdResult = await executeQuery('SELECT COALESCE(MAX(id), 9999) + 1 as nextId FROM ai_characters');
+    const nextId = Math.max(maxIdResult[0]?.nextId || 10000, 10000);
     const id = await executeInsert(
-      `INSERT INTO ai_characters (name, avatar, personality, description, voice_id, age, gender, background, likes, speaking_style, relationship, greeting) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [character.name, character.avatar, character.personality, character.description, character.voice_id,
+      `INSERT INTO ai_characters (id, name, avatar, personality, description, voice_id, age, gender, background, likes, speaking_style, relationship, greeting) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [nextId, character.name, character.avatar, character.personality, character.description, character.voice_id,
        character.age, character.gender, character.background, character.likes, character.speaking_style, 
        character.relationship, character.greeting]
     );
-    const newCharacter = { id, ...character, is_active: 1 };
+    const newCharacter = { id: nextId, ...character, is_active: 1 };
     set((state) => ({ aiCharacters: [...state.aiCharacters, newCharacter] }));
-    return id;
+    return nextId;
   },
 
   updateAICharacter: async (id, updates) => {
@@ -94,6 +96,7 @@ export const useAppStore = create((set, get) => ({
   clearAllMoments: async () => {
     await executeUpdate('DELETE FROM moment_comments');
     await executeUpdate('DELETE FROM moments');
+    await executeUpdate('DELETE FROM notifications');
     set({ moments: [] });
   },
 
@@ -110,8 +113,11 @@ export const useAppStore = create((set, get) => ({
     await executeUpdate('DELETE FROM diaries');
     await executeUpdate('DELETE FROM ai_memories');
     await executeUpdate('DELETE FROM scheduled_tasks');
+    await executeUpdate('DELETE FROM notifications');
     set({ messages: [], moments: [] });
   },
+
+
 
   getStorageInfo: async () => {
     const messageCount = await executeQuery('SELECT COUNT(*) as count FROM messages');
