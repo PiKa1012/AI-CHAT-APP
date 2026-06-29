@@ -39,6 +39,37 @@ export default function MusicPlayer() {
 
   const currentSong = currentIndex >= 0 && currentIndex < queue.length ? queue[currentIndex] : null;
 
+  const rotation = useRef(new Animated.Value(0)).current;
+  const spinAnimRef = useRef(null);
+
+  useEffect(() => {
+    if (isPlaying && currentSong) {
+      const anim = Animated.loop(
+        Animated.timing(rotation, {
+          toValue: 1,
+          duration: 8000,
+          useNativeDriver: true,
+        })
+      );
+      anim.start();
+      spinAnimRef.current = anim;
+    } else if (spinAnimRef.current) {
+      spinAnimRef.current.stop();
+      spinAnimRef.current = null;
+    }
+    return () => {
+      if (spinAnimRef.current) {
+        spinAnimRef.current.stop();
+        spinAnimRef.current = null;
+      }
+    };
+  }, [isPlaying, currentSong?.id]);
+
+  const spin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
   const handlePlaySong = async (song) => {
     if (!song.url) {
       const url = await getSongUrl(song.id);
@@ -206,9 +237,9 @@ export default function MusicPlayer() {
           style={[styles.floatingBtn, { transform: [{ translateX: pan.x }, { translateY: pan.y }] }]}
           {...panResponder.panHandlers}
         >
-          <Image
+          <Animated.Image
             source={{ uri: currentSong.cover || 'https://via.placeholder.com/52/4A90D9/fff?text=♫' }}
-            style={styles.floatingCover}
+            style={[styles.floatingCover, { transform: [{ rotate: spin }] }]}
           />
           <View style={styles.floatingOverlay}>
             <Ionicons name={isLoading ? 'hourglass-outline' : isPlaying ? 'pause' : 'play'} size={20} color="#4A90D9" />
