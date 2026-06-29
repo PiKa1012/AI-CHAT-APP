@@ -1,0 +1,10 @@
+{
+  "name": "ai-companion-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "qrcode": "^1.5.4"
+  }
+}

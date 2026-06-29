@@ -93,6 +93,13 @@ export default function SettingsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>AI设置</Text>
         <SettingItem
+          icon="logo-wechat"
+          title="连接微信"
+          subtitle="把AI角色接入微信聊天"
+          color="#67C23A"
+          onPress={() => router.push('/wechat-connect')}
+        />
+        <SettingItem
           icon="key"
           title="API配置"
           subtitle="配置大模型API，让AI真正智能"
