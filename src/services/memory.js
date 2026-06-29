@@ -150,6 +150,8 @@ ${conversationText}
   }
 }
 
+import { trackUsage } from './usage';
+
 async function callMemoryAPI(prompt, settings) {
   const provider = settings.provider || 'openai';
   const baseUrl = settings.apiBaseUrl || getDefaultBaseUrl(provider);
@@ -172,6 +174,16 @@ async function callMemoryAPI(prompt, settings) {
   if (!response.ok) return null;
 
   const data = await response.json();
+  if (data.usage) {
+    trackUsage({
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+      model,
+      provider: settings.provider || 'unknown',
+      endpoint: 'memory',
+    });
+  }
   return data.choices?.[0]?.message?.content?.trim() || null;
 }
 

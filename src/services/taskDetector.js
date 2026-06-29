@@ -1,6 +1,7 @@
 import { getAPISettings } from './settings';
 import { createScheduledTask } from './scheduler';
 import { getBeijingNow } from '../utils/time';
+import { trackUsage } from './usage';
 
 export async function detectAndCreateTask(aiId, userMessage) {
   const settings = await getAPISettings();
@@ -79,6 +80,16 @@ export async function detectAndCreateTask(aiId, userMessage) {
     if (!response.ok) return null;
 
     const data = await response.json();
+    if (data.usage) {
+      trackUsage({
+        promptTokens: data.usage.prompt_tokens,
+        completionTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens,
+        model,
+        provider: settings.provider || 'unknown',
+        endpoint: 'task_detector',
+      });
+    }
     const content = data.choices?.[0]?.message?.content;
     
     const jsonMatch = content.match(/\{[\s\S]*\}/);

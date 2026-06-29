@@ -24,7 +24,8 @@
         "WRITE_EXTERNAL_STORAGE",
         "CAMERA"
       ],
-      "package": "com.aicompanion.app"
+      "package": "com.aicompanion.app",
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png"

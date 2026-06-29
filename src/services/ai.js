@@ -7,6 +7,7 @@ import { getAPISettings, clearAPISettingsCache, loadSetting } from './settings';
 import { getRelevantMemories, formatMemoriesForPrompt, extractMemories } from './memory';
 import { generateMomentImage } from './imageGen';
 import { sendLocalNotification } from './notification';
+import { trackUsage } from './usage';
 
 export { clearAPISettingsCache as clearSettingsCache };
 
@@ -53,6 +54,16 @@ export async function callAIAPI(messages, systemPrompt = '') {
   }
 
   const data = await response.json();
+  if (data.usage) {
+    trackUsage({
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+      model,
+      provider: settings.provider || 'unknown',
+      endpoint: 'chat',
+    });
+  }
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('API返回数据格式错误');
   return content;
@@ -132,6 +143,16 @@ export async function analyzeImage(imageBase64, question = '请描述这张图�
   }
 
   const data = await response.json();
+  if (data.usage) {
+    trackUsage({
+      promptTokens: data.usage.prompt_tokens,
+      completionTokens: data.usage.completion_tokens,
+      totalTokens: data.usage.total_tokens,
+      model,
+      provider: 'vision',
+      endpoint: 'vision',
+    });
+  }
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('Vision API返回数据格式错误');
   return content;

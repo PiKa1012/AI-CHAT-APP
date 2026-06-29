@@ -192,6 +192,13 @@ export default function SettingsScreen() {
           onPress={() => router.push('/log-viewer')}
         />
         <SettingItem
+          icon="stats-chart"
+          title="API用量"
+          subtitle="查看Token消耗和DeepSeek余额"
+          color="#4A90D9"
+          onPress={() => router.push('/usage-stats')}
+        />
+        <SettingItem
           icon="information-circle"
           title="关于"
           subtitle="版本 1.0.0"
