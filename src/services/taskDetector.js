@@ -1,7 +1,7 @@
 import { getAPISettings } from './settings';
 import { createScheduledTask } from './scheduler';
 import { getBeijingNow } from '../utils/time';
-import { trackUsage } from './usage';
+import { trackUsage, extractCachedTokens } from './usage';
 
 export async function detectAndCreateTask(aiId, userMessage) {
   const settings = await getAPISettings();
@@ -85,6 +85,7 @@ export async function detectAndCreateTask(aiId, userMessage) {
         promptTokens: data.usage.prompt_tokens,
         completionTokens: data.usage.completion_tokens,
         totalTokens: data.usage.total_tokens,
+        cachedTokens: extractCachedTokens(data.usage),
         model,
         provider: settings.provider || 'unknown',
         endpoint: 'task_detector',
