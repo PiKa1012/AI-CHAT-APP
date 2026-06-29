@@ -9,6 +9,9 @@ const NOTIFICATION_TYPES = {
   like: { icon: 'heart', color: '#F56C6C', label: '点赞' },
   comment: { icon: 'chatbubble', color: '#4A90D9', label: '评论' },
   reply: { icon: 'return-down-back', color: '#67C23A', label: '回复' },
+  moment: { icon: 'camera', color: '#FF69B4', label: '新朋友圈' },
+  diary: { icon: 'book', color: '#9B59B6', label: '新日记' },
+  group_chat: { icon: 'chatbubbles', color: '#4A90D9', label: '群聊消息' },
 };
 
 export default function NotificationCenter() {
@@ -68,6 +71,8 @@ export default function NotificationCenter() {
                 commentId: data.commentId?.toString() || ''
               } 
             });
+          } else if (data.type === 'diary') {
+            router.push('/(tabs)/diary');
           } else {
             router.push('/(tabs)/moments');
           }

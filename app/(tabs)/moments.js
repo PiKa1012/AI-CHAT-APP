@@ -448,6 +448,14 @@ export default function MomentsScreen() {
 
         <Text style={styles.momentContent}>{item.content}</Text>
 
+        {item.images?.length > 0 && (
+          <View style={styles.momentImages}>
+            {item.images.map((img, i) => (
+              <Image key={i} source={{ uri: img }} style={styles.momentImage} resizeMode="cover" />
+            ))}
+          </View>
+        )}
+
         <View style={styles.momentActions}>
           <TouchableOpacity
             style={styles.actionBtn}
@@ -790,6 +798,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginTop: 2,
+  },
+  momentImages: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  momentImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
   },
   momentContent: {
     fontSize: 15,

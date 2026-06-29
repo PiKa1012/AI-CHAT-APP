@@ -239,6 +239,7 @@ export const useAppStore = create((set, get) => ({
         [moment.id]
       );
       moment.likes = JSON.parse(moment.likes || '[]');
+      moment.images = JSON.parse(moment.images || '[]');
     }
     set({ moments });
   },

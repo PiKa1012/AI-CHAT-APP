@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
 import { useAppStore } from '../../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
@@ -130,6 +130,14 @@ export default function DiaryScreen() {
 
       <Text style={styles.diaryTitle}>{item.title}</Text>
       <Text style={styles.diaryContent}>{item.content}</Text>
+
+      {item.images?.length > 0 && (
+        <View style={styles.diaryImages}>
+          {item.images.map((img, i) => (
+            <Image key={i} source={{ uri: img }} style={styles.diaryImage} resizeMode="cover" />
+          ))}
+        </View>
+      )}
 
       {item.tags?.length > 0 && (
         <View style={styles.tagsContainer}>
@@ -449,6 +457,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
+  },
+  diaryImages: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  diaryImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
   },
   diaryContent: {
     fontSize: 15,

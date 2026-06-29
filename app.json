@@ -24,7 +24,9 @@
         "WRITE_EXTERNAL_STORAGE",
         "CAMERA",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.aicompanion.app"
     },
@@ -48,6 +50,15 @@
         }
       ],
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "eafd7cbe-424b-4c11-9957-8dccb14699f4"
+      }
+    },
+    "owner": "pika6734"
   }
 }
