@@ -1,11 +1,18 @@
 import { executeInsert, executeQuery } from '../database';
 
-export async function trackUsage({ promptTokens = 0, completionTokens = 0, totalTokens = 0, model = '', provider = '', endpoint = '' }) {
+export function extractCachedTokens(usage) {
+  if (!usage) return 0;
+  if (usage.prompt_tokens_details?.cached_tokens) return usage.prompt_tokens_details.cached_tokens;
+  if (usage.prompt_cache_hit_tokens) return usage.prompt_cache_hit_tokens;
+  return 0;
+}
+
+export async function trackUsage({ promptTokens = 0, completionTokens = 0, totalTokens = 0, cachedTokens = 0, model = '', provider = '', endpoint = '' }) {
   try {
     await executeInsert(
-      `INSERT INTO api_usage (prompt_tokens, completion_tokens, total_tokens, model, provider, endpoint)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [promptTokens, completionTokens, totalTokens, model, provider, endpoint]
+      `INSERT INTO api_usage (prompt_tokens, completion_tokens, total_tokens, cached_tokens, model, provider, endpoint)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [promptTokens, completionTokens, totalTokens, cachedTokens, model, provider, endpoint]
     );
   } catch (e) {
     console.warn('Failed to track usage:', e);
@@ -18,53 +25,84 @@ export async function getUsageStats() {
        COALESCE(SUM(total_tokens), 0) as total_tokens,
        COALESCE(SUM(prompt_tokens), 0) as total_prompt,
        COALESCE(SUM(completion_tokens), 0) as total_completion,
-       COUNT(*) as total_calls,
-       COALESCE(MAX(provider), '') as last_provider
+       COALESCE(SUM(cached_tokens), 0) as total_cached,
+       COUNT(*) as total_calls
      FROM api_usage`
   );
 
   const today = await executeQuery(
     `SELECT
        COALESCE(SUM(total_tokens), 0) as total_tokens,
+       COALESCE(SUM(prompt_tokens), 0) as total_prompt,
+       COALESCE(SUM(completion_tokens), 0) as total_completion,
+       COALESCE(SUM(cached_tokens), 0) as total_cached,
        COUNT(*) as total_calls
      FROM api_usage
      WHERE date(created_at) = date('now')`
   );
 
-  const todayTotal = today[0]?.total_tokens || 0;
-  const todayCalls = today[0]?.total_calls || 0;
-  const totalObj = total[0] || { total_tokens: 0, total_prompt: 0, total_completion: 0, total_calls: 0, last_provider: '' };
+  const lastRecord = await executeQuery(
+    `SELECT provider, model FROM api_usage ORDER BY id DESC LIMIT 1`
+  );
+
+  const dailyStats = await executeQuery(
+    `SELECT
+       date(created_at) as day,
+       SUM(total_tokens) as total_tokens,
+       SUM(prompt_tokens) as total_prompt,
+       SUM(completion_tokens) as total_completion,
+       SUM(cached_tokens) as total_cached,
+       COUNT(*) as calls
+     FROM api_usage
+     GROUP BY date(created_at)
+     ORDER BY day DESC
+     LIMIT 30`
+  );
+
+  const t = total[0] || {};
+  const d = today[0] || {};
+  const provider = lastRecord[0]?.provider || '';
 
   return {
-    todayTokens: todayTotal,
-    todayCalls,
-    totalTokens: totalObj.total_tokens,
-    totalPrompt: totalObj.total_prompt,
-    totalCompletion: totalObj.total_completion,
-    totalCalls: totalObj.total_calls,
-    provider: totalObj.last_provider || 'unknown',
-    estimatedCost: estimateCost(totalObj.total_tokens, totalObj.last_provider),
+    hasData: t.total_calls > 0,
+    provider,
+    model: lastRecord[0]?.model || '',
+    todayTokens: d.total_tokens || 0,
+    todayPrompt: d.total_prompt || 0,
+    todayCompletion: d.total_completion || 0,
+    todayCached: d.total_cached || 0,
+    todayCalls: d.total_calls || 0,
+    totalTokens: t.total_tokens || 0,
+    totalPrompt: t.total_prompt || 0,
+    totalCompletion: t.total_completion || 0,
+    totalCached: t.total_cached || 0,
+    totalCalls: t.total_calls || 0,
+    dailyStats: (dailyStats || []).map(row => ({
+      day: row.day,
+      prompt: row.total_prompt || 0,
+      completion: row.total_completion || 0,
+      cached: row.total_cached || 0,
+      calls: row.calls || 0,
+    })),
+    estimatedCost: estimateDeepSeekCost(t.total_prompt || 0, t.total_completion || 0, t.total_cached || 0),
+    todayCost: estimateDeepSeekCost(d.total_prompt || 0, d.total_completion || 0, d.total_cached || 0),
   };
 }
 
-const PRICING = {
-  deepseek: { input: 0.5, output: 2, currency: 'USD', label: 'DeepSeek' },
-  openai: { input: 2.5, output: 10, currency: 'USD', label: 'OpenAI GPT-4o' },
-  qwen: { input: 0.3, output: 0.6, currency: 'CNY', label: '通义千问' },
-  wenxin: { input: 0.3, output: 0.6, currency: 'CNY', label: '文心一言' },
-  claude: { input: 3, output: 15, currency: 'USD', label: 'Claude 3 Sonnet' },
+// DeepSeek V4 Flash 定价 (¥/1M tokens)
+const DS_PRICES = {
+  cacheHit: 0.02,
+  cacheMiss: 1,
+  output: 2,
 };
 
-function estimateCost(totalTokens, provider) {
-  const price = PRICING[provider];
-  if (!price) return null;
-  const avgCostPer1M = (price.input + price.output) / 2;
-  return {
-    amount: ((totalTokens / 1000000) * avgCostPer1M).toFixed(4),
-    currency: price.currency,
-    label: price.label,
-  };
+function estimateDeepSeekCost(promptTokens, completionTokens, cachedTokens) {
+  const cacheMissTokens = Math.max(0, promptTokens - cachedTokens);
+  const cost = (cachedTokens * DS_PRICES.cacheHit + cacheMissTokens * DS_PRICES.cacheMiss + completionTokens * DS_PRICES.output) / 1000000;
+  return { amount: cost.toFixed(6), currency: 'CNY' };
 }
+
+export const SUPPORTS_BALANCE = ['deepseek'];
 
 export async function getBalance(provider, apiKey) {
   if (provider === 'deepseek') {
@@ -82,7 +120,6 @@ export function formatBalanceInfo(provider, raw) {
       total: total.toFixed(2),
       currency: raw.balance_infos?.[0]?.currency || 'CNY',
       label: '可用余额',
-      details: available,
     };
   }
   return null;

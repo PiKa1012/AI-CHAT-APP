@@ -37,7 +37,7 @@ export default function RootLayout() {
     startScheduler();
 
     addNotificationListener(notification => {
-      console.log('通知收到:', notification);
+      // console.log('通知收到:', notification);
     });
 
     addNotificationResponseListener(async (response) => {

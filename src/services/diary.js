@@ -2,7 +2,7 @@ import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { getBeijingNow } from '../utils/time';
 import { getAPISettings } from './settings';
 import { generateDiaryImage } from './imageGen';
-import { trackUsage } from './usage';
+import { trackUsage, extractCachedTokens } from './usage';
 
 async function callAIAPI(messages, systemPrompt = '') {
   const settings = await getAPISettings();
@@ -38,6 +38,7 @@ async function callAIAPI(messages, systemPrompt = '') {
       promptTokens: data.usage.prompt_tokens,
       completionTokens: data.usage.completion_tokens,
       totalTokens: data.usage.total_tokens,
+      cachedTokens: extractCachedTokens(data.usage),
       model,
       provider: settings.provider || 'unknown',
       endpoint: 'diary',

@@ -275,9 +275,6 @@ export default function WechatConnectScreen() {
 }
 
 function buildPersonalityPrompt(character) {
-  const now = new Date();
-  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-  const timeStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
   return `你是${character.name}，性格${character.personality || '友好'}。${character.description || ''}
 ${character.age ? `年龄：${character.age}岁` : ''}
 ${character.gender ? `性别：${character.gender}` : ''}
@@ -285,7 +282,6 @@ ${character.background ? `背景：${character.background}` : ''}
 ${character.likes ? `兴趣爱好：${character.likes}` : ''}
 ${character.speaking_style ? `说话风格：${character.speaking_style}` : ''}
 ${character.relationship ? `与用户的关系：${character.relationship}` : ''}
-当前时间：${timeStr}
 请用符合这个性格的方式回复，保持简洁自然，像朋友聊天一样。不要使用emoji。`;
 }
 

@@ -204,8 +204,14 @@ async function callAI(text) {
   if (!sessions['wechat']) sessions['wechat'] = [];
   sessions['wechat'].push({ role: 'user', content: text });
 
+  // system prompt 末尾注入当前时间
+  const now = new Date();
+  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+  const timeStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 星期${weekDays[now.getDay()]} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const systemContent = `${cfg.systemPrompt || '你是一个友善的AI伙伴'}\n当前时间：${timeStr}`;
+
   const messages = [
-    { role: 'system', content: cfg.systemPrompt || '你是一个友善的AI伙伴' },
+    { role: 'system', content: systemContent },
     ...sessions['wechat'].slice(-40),
   ];
 

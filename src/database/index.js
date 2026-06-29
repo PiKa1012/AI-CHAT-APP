@@ -192,12 +192,15 @@ async function initDatabase(database) {
       prompt_tokens INTEGER DEFAULT 0,
       completion_tokens INTEGER DEFAULT 0,
       total_tokens INTEGER DEFAULT 0,
+      cached_tokens INTEGER DEFAULT 0,
       model TEXT,
       provider TEXT,
       endpoint TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  try { await database.execAsync('ALTER TABLE api_usage ADD COLUMN cached_tokens INTEGER DEFAULT 0'); } catch (e) {}
 }
 
 export async function executeQuery(sql, params = []) {

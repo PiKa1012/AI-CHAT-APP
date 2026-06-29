@@ -150,7 +150,7 @@ ${conversationText}
   }
 }
 
-import { trackUsage } from './usage';
+import { trackUsage, extractCachedTokens } from './usage';
 
 async function callMemoryAPI(prompt, settings) {
   const provider = settings.provider || 'openai';
@@ -179,6 +179,7 @@ async function callMemoryAPI(prompt, settings) {
       promptTokens: data.usage.prompt_tokens,
       completionTokens: data.usage.completion_tokens,
       totalTokens: data.usage.total_tokens,
+      cachedTokens: extractCachedTokens(data.usage),
       model,
       provider: settings.provider || 'unknown',
       endpoint: 'memory',

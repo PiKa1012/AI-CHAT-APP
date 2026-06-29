@@ -7,7 +7,7 @@ import { getAPISettings, clearAPISettingsCache, loadSetting } from './settings';
 import { getRelevantMemories, formatMemoriesForPrompt, extractMemories } from './memory';
 import { generateMomentImage } from './imageGen';
 import { sendLocalNotification } from './notification';
-import { trackUsage } from './usage';
+import { trackUsage, extractCachedTokens } from './usage';
 
 export { clearAPISettingsCache as clearSettingsCache };
 
@@ -59,6 +59,7 @@ export async function callAIAPI(messages, systemPrompt = '') {
       promptTokens: data.usage.prompt_tokens,
       completionTokens: data.usage.completion_tokens,
       totalTokens: data.usage.total_tokens,
+      cachedTokens: extractCachedTokens(data.usage),
       model,
       provider: settings.provider || 'unknown',
       endpoint: 'chat',
@@ -148,6 +149,7 @@ export async function analyzeImage(imageBase64, question = '请描述这张图�
       promptTokens: data.usage.prompt_tokens,
       completionTokens: data.usage.completion_tokens,
       totalTokens: data.usage.total_tokens,
+      cachedTokens: extractCachedTokens(data.usage),
       model,
       provider: settings.provider || 'vision',
       endpoint: 'vision',

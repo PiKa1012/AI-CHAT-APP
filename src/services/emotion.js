@@ -1,6 +1,6 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { getAPISettings } from './settings';
-import { trackUsage } from './usage';
+import { trackUsage, extractCachedTokens } from './usage';
 
 const EMOTIONS = {
   happy: { name: '开心', emoji: '😊', valence: 1 },
@@ -146,6 +146,7 @@ ${name}：${aiResponse}
         promptTokens: data.usage.prompt_tokens,
         completionTokens: data.usage.completion_tokens,
         totalTokens: data.usage.total_tokens,
+        cachedTokens: extractCachedTokens(data.usage),
         model,
         provider: settings.provider || 'unknown',
         endpoint: 'emotion',
