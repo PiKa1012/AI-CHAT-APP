@@ -149,7 +149,7 @@ export async function analyzeImage(imageBase64, question = '请描述这张图�
       completionTokens: data.usage.completion_tokens,
       totalTokens: data.usage.total_tokens,
       model,
-      provider: 'vision',
+      provider: settings.provider || 'vision',
       endpoint: 'vision',
     });
   }
