@@ -1,5 +1,4 @@
 import { loadSetting } from './settings';
-import * as Location from 'expo-location';
 
 const BASE_URL = 'https://restapi.amap.com/v3';
 
@@ -117,27 +116,6 @@ export async function getAddressFromLocation(location) {
 }
 
 export async function getCurrentLocation() {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status === 'granted') {
-      const pos = await Promise.race([
-        Location.getCurrentPositionAsync({}),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('定位超时')), 6000)),
-      ]);
-      if (pos?.coords) {
-        const { latitude, longitude } = pos.coords;
-        const locStr = `${longitude.toFixed(6)},${latitude.toFixed(6)}`;
-        try {
-          const addr = await getAddressFromLocation(locStr);
-          return { source: 'gps', city: addr.city || '', province: addr.province || '', lat: latitude.toFixed(6), lng: longitude.toFixed(6), location: locStr };
-        } catch {
-          return { source: 'gps', city: '', province: '', lat: latitude.toFixed(6), lng: longitude.toFixed(6), location: locStr };
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('GPS定位失败，降级到IP:', e?.message || e);
-  }
   return getLocationByIP();
 }
 

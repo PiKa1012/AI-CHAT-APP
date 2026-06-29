@@ -22,11 +22,7 @@
         "NOTIFICATIONS",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "CAMERA"
       ],
       "package": "com.aicompanion.app"
     },
@@ -36,20 +32,15 @@
     "plugins": [
       "expo-router",
       [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "允许 $(PRODUCT_NAME) 获取你的位置信息",
-          "locationWhenInUsePermission": "允许 $(PRODUCT_NAME) 获取你的位置信息"
-        }
-      ],
-      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
           "color": "#4A90D9"
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-sqlite",
+      "expo-font"
     ],
     "extra": {
       "router": {
