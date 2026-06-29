@@ -1,13 +1,13 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, Image, Animated, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
-import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useAppStore } from '../../src/stores';
+import { useRouter, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { useAppStore } from '../src/stores';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { sendLocalNotification, getUnreadCount } from '../../src/services/notification';
-import { aiCommentOnMoment } from '../../src/services/ai';
-import { formatDateTime } from '../../src/utils/time';
-import { SafeAvatar } from '../../src/components/SafeImage';
-import { loadSetting } from '../../src/services/settings';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import { sendLocalNotification, getUnreadCount } from '../src/services/notification';
+import { aiCommentOnMoment } from '../src/services/ai';
+import { formatDateTime } from '../src/utils/time';
+import { SafeAvatar } from '../src/components/SafeImage';
+import { loadSetting } from '../src/services/settings';
 import * as ImagePicker from 'expo-image-picker';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -15,9 +15,10 @@ const COVER_HEIGHT = 240;
 const IMAGE_GAP = 4;
 const CARD_PADDING = 14;
 
-export default function MomentsScreen() {
+export default function MomentFeedScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const navigation = useNavigation();
   const moments = useAppStore(s => s.moments);
   const loadMoments = useAppStore(s => s.loadMoments);
   const addMoment = useAppStore(s => s.addMoment);
@@ -42,6 +43,13 @@ export default function MomentsScreen() {
   const flatListRef = useRef(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const commentInputRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (filterAuthor) {
+      const name = getAuthorName(filterAuthor === 'user' ? 'user' : 'ai', filterAuthor === 'user' ? 1 : parseInt(filterAuthor));
+      navigation.setOptions({ title: `${name} 的动态` });
+    }
+  }, [filterAuthor]);
 
   useEffect(() => {
     loadMoments();

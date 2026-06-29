@@ -10,6 +10,7 @@ import { SafeAvatar } from '../src/components/SafeImage';
 import { loadSetting } from '../src/services/settings';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const IMAGE_GAP = 4;
 
 export default function MomentDetailScreen() {
   const router = useRouter();
@@ -24,6 +25,8 @@ export default function MomentDetailScreen() {
   const [commentText, setCommentText] = useState('');
   const [replyToComment, setReplyToComment] = useState(null);
   const [expandedComments, setExpandedComments] = useState({});
+  const [imagePreview, setImagePreview] = useState(null);
+  const inputRef = useRef(null);
 
   const moment = moments.find(m => m.id === parseInt(momentId));
   const replyTarget = replyToComment ? moment?.comments?.find(c => c.id === replyToComment) : null;
@@ -53,7 +56,7 @@ export default function MomentDetailScreen() {
 
   const getAvatarColor = (type, id) => {
     if (type === 'user') return '#67C23A';
-    const colors = ['#4A90D9', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C'];
+    const colors = ['#4A90D9', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C'];
     return colors[(id - 1) % colors.length];
   };
 
@@ -117,22 +120,27 @@ export default function MomentDetailScreen() {
     return allReplies;
   };
 
+  const getImageGridSize = (count) => {
+    if (count === 1) return { cols: 1, imageWidth: SCREEN_WIDTH - 48, imageHeight: (SCREEN_WIDTH - 48) * 0.6 };
+    if (count <= 3) return { cols: 3, imageWidth: (SCREEN_WIDTH - 48 - IMAGE_GAP * 2) / 3, imageHeight: (SCREEN_WIDTH - 48 - IMAGE_GAP * 2) / 3 };
+    if (count <= 6) return { cols: 3, imageWidth: (SCREEN_WIDTH - 48 - IMAGE_GAP * 2) / 3, imageHeight: (SCREEN_WIDTH - 48 - IMAGE_GAP * 2) / 3 };
+    return { cols: 3, imageWidth: (SCREEN_WIDTH - 48 - IMAGE_GAP * 2) / 3, imageHeight: (SCREEN_WIDTH - 48 - IMAGE_GAP * 2) / 3 };
+  };
+
   const renderNestedComment = (comment, isReply = false) => {
     const isUser = comment.author_type === 'user';
     return (
       <View key={comment.id} style={[styles.commentItem, isReply && styles.commentNested]}>
-        <View style={styles.commentRow}>
-          <SafeAvatar uri={isUser ? userProfile.avatar : getAuthorAvatarUri('ai', comment.author_id)} size={26} name={getAuthorName(comment.author_type, comment.author_id)} color={getAvatarColor(comment.author_type, comment.author_id)} />
-          <View style={styles.commentContent}>
-            <Text style={styles.commentAuthor}>{getAuthorName(comment.author_type, comment.author_id)}</Text>
-            <Text style={styles.commentText}>{comment.content}</Text>
-            <View style={styles.commentActions}>
-              <Text style={styles.commentTime}>{formatDateTime(comment.created_at)}</Text>
-              <TouchableOpacity onPress={() => { setReplyToComment(comment.id); }}>
-                <Text style={styles.commentActionText}>回复</Text>
-              </TouchableOpacity>
-              {isUser && <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}><Text style={[styles.commentActionText, { color: '#F56C6C' }]}>删除</Text></TouchableOpacity>}
-            </View>
+        <SafeAvatar uri={isUser ? userProfile.avatar : getAuthorAvatarUri('ai', comment.author_id)} size={28} name={getAuthorName(comment.author_type, comment.author_id)} color={getAvatarColor(comment.author_type, comment.author_id)} />
+        <View style={styles.commentContent}>
+          <Text style={styles.commentAuthor}>{getAuthorName(comment.author_type, comment.author_id)}</Text>
+          <Text style={styles.commentText}>{comment.content}</Text>
+          <View style={styles.commentActions}>
+            <Text style={styles.commentTime}>{formatDateTime(comment.created_at)}</Text>
+            <TouchableOpacity onPress={() => { setReplyToComment(comment.id); inputRef.current?.focus(); }}>
+              <Text style={styles.commentActionText}>回复</Text>
+            </TouchableOpacity>
+            {isUser && <TouchableOpacity onPress={() => handleDeleteComment(comment.id)}><Text style={[styles.commentActionText, { color: '#F56C6C' }]}>删除</Text></TouchableOpacity>}
           </View>
         </View>
       </View>
@@ -142,11 +150,11 @@ export default function MomentDetailScreen() {
   if (!moment) {
     return (
       <View style={styles.container}>
-        <View style={styles.errorContainer}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
           <Ionicons name="images-outline" size={48} color="#ddd" />
-          <Text style={styles.errorText}>动态不存在</Text>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backBtnText}>返回</Text>
+          <Text style={{ fontSize: 16, color: '#999' }}>动态不存在</Text>
+          <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#4A90D9', borderRadius: 6 }} onPress={() => router.back()}>
+            <Text style={{ color: '#fff', fontSize: 15 }}>返回</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -155,29 +163,43 @@ export default function MomentDetailScreen() {
 
   const isUser = moment.author_type === 'user';
   const isLiked = moment.likes?.includes(1);
+  const imgSize = getImageGridSize(moment.images?.length || 0);
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <FlatList
         style={{ flex: 1 }}
         data={[{ key: 'moment' }]}
-        contentContainerStyle={{ paddingBottom: 8 }}
+        contentContainerStyle={styles.listContent}
         renderItem={() => (
-          <View style={styles.momentCard}>
-            <View style={styles.momentHeader}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
               <SafeAvatar uri={isUser ? userProfile.avatar : getAuthorAvatarUri('ai', moment.author_id)} size={44} name={getAuthorName(moment.author_type, moment.author_id)} color={getAvatarColor(moment.author_type, moment.author_id)} />
-              <View style={styles.momentAuthorInfo}>
-                <Text style={styles.momentAuthor}>{getAuthorName(moment.author_type, moment.author_id)}</Text>
-                <Text style={styles.momentTime}>{formatDateTime(moment.created_at)}</Text>
+              <View style={styles.cardHeaderInfo}>
+                <Text style={styles.cardHeaderName}>{getAuthorName(moment.author_type, moment.author_id)}</Text>
+                <Text style={styles.cardHeaderTime}>{formatDateTime(moment.created_at)}</Text>
               </View>
             </View>
 
-            <Text style={styles.momentText}>{moment.content}</Text>
+            {moment.content ? (
+              <Text style={styles.contentText}>{moment.content}</Text>
+            ) : null}
 
             {moment.images?.length > 0 && (
-              <View style={styles.momentImages}>
+              <View style={[styles.imageGrid, { gap: IMAGE_GAP }]}>
                 {moment.images.map((img, i) => (
-                  <Image key={i} source={{ uri: img }} style={moment.images.length === 1 ? styles.momentImageSingle : styles.momentImage} resizeMode="cover" />
+                  <TouchableOpacity key={i} activeOpacity={0.8} onPress={() => setImagePreview(img)}>
+                    <Image
+                      source={{ uri: img }}
+                      style={{
+                        width: imgSize.imageWidth,
+                        height: imgSize.imageHeight,
+                        borderRadius: 6,
+                        backgroundColor: '#f0f0f0',
+                      }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -185,11 +207,11 @@ export default function MomentDetailScreen() {
             <View style={styles.actionBar}>
               <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
                 <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? '#F56C6C' : '#999'} />
-                <Text style={[styles.actionBarText, isLiked && { color: '#F56C6C' }]}>{moment.likes?.length || 0}</Text>
+                <Text style={[styles.actionBtnText, isLiked && { color: '#F56C6C' }]}>{moment.likes?.length || 0}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => { setReplyToComment(null); }}>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => { setReplyToComment(null); inputRef.current?.focus(); }}>
                 <Ionicons name="chatbubble-outline" size={21} color="#999" />
-                <Text style={styles.actionBarText}>{moment.comments?.length || 0}</Text>
+                <Text style={styles.actionBtnText}>{moment.comments?.length || 0}</Text>
               </TouchableOpacity>
             </View>
 
@@ -207,7 +229,6 @@ export default function MomentDetailScreen() {
 
             {moment.comments?.length > 0 && (
               <View style={styles.commentsSection}>
-                <Text style={styles.commentsSectionTitle}>全部评论</Text>
                 {getNestedComments(moment.comments).map(rootComment => {
                   const allReplies = rootComment.replies || [];
                   const isExpanded = expandedComments[rootComment.id] === true;
@@ -235,79 +256,109 @@ export default function MomentDetailScreen() {
       />
 
       <View style={styles.inputBar}>
-        <View style={styles.inputBarRow}>
-          {replyToComment && (
+        {replyToComment && replyTarget && (
+          <View style={styles.inputBarReply}>
+            <Text style={styles.inputBarReplyText}>回复 @{getAuthorName(replyTarget.author_type, replyTarget.author_id)}：{replyTarget.content.slice(0, 20)}{replyTarget.content.length > 20 ? '...' : ''}</Text>
             <TouchableOpacity onPress={() => { setReplyToComment(null); setCommentText(''); }}>
-              <Ionicons name="close" size={22} color="#999" />
+              <Ionicons name="close" size={18} color="#999" />
             </TouchableOpacity>
-          )}
+          </View>
+        )}
+        <View style={styles.inputBarRow}>
           <TextInput
+            ref={inputRef}
             style={styles.inputField}
             value={commentText}
             onChangeText={setCommentText}
-            placeholder={replyToComment ? '回复评论...' : '写评论...'}
+            placeholder={replyToComment ? '回复...' : '写评论...'}
             placeholderTextColor="#999"
-            autoFocus
           />
           <TouchableOpacity
             style={[styles.sendBtn, !commentText.trim() && { opacity: 0.4 }]}
             disabled={!commentText.trim()}
             onPress={() => handleComment(commentText, replyToComment)}
           >
-            <Text style={styles.sendBtnText}>发送</Text>
+            <Ionicons name="send" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
-        {replyTarget && <View style={styles.inputBarReply}><Text style={styles.inputBarReplyText}>回复 @{getAuthorName(replyTarget.author_type, replyTarget.author_id)}：{replyTarget.content.slice(0, 20)}{replyTarget.content.length > 20 ? '...' : ''}</Text></View>}
       </View>
+
+      <Modal visible={!!imagePreview} transparent onRequestClose={() => setImagePreview(null)}>
+        <TouchableOpacity style={styles.previewOverlay} activeOpacity={1} onPress={() => setImagePreview(null)}>
+          {imagePreview && <Image source={{ uri: imagePreview }} style={styles.previewImage} resizeMode="contain" />}
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
+  listContent: { padding: 12, paddingBottom: 8 },
 
-  momentCard: { padding: 16 },
-  momentHeader: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  momentAuthorInfo: { justifyContent: 'center' },
-  momentAuthor: { fontSize: 16, fontWeight: '600', color: '#4A90D9' },
-  momentTime: { fontSize: 12, color: '#999', marginTop: 2 },
-  momentText: { fontSize: 16, color: '#333', lineHeight: 24 },
-  momentImages: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 10 },
-  momentImage: { width: (SCREEN_WIDTH - 48) / 3, height: (SCREEN_WIDTH - 48) / 3, borderRadius: 4, backgroundColor: '#f0f0f0' },
-  momentImageSingle: { width: SCREEN_WIDTH - 32, height: (SCREEN_WIDTH - 32) * 0.6, borderRadius: 4, backgroundColor: '#f0f0f0' },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+  },
+  cardHeaderInfo: { flex: 1 },
+  cardHeaderName: { fontSize: 16, fontWeight: '600', color: '#4A90D9' },
+  cardHeaderTime: { fontSize: 12, color: '#bbb', marginTop: 1 },
 
-  actionBar: { flexDirection: 'row', gap: 24, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
+  contentText: { fontSize: 16, color: '#333', lineHeight: 24, marginTop: 12 },
+  imageGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12 },
+
+  actionBar: {
+    flexDirection: 'row',
+    gap: 24,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  actionBarText: { fontSize: 14, color: '#999' },
+  actionBtnText: { fontSize: 14, color: '#999' },
 
-  likesBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f8f8', padding: 10, borderRadius: 4, marginTop: 12, gap: 4 },
+  likesBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 4,
+  },
   likesText: { fontSize: 14, color: '#666', flex: 1 },
 
-  commentsSection: { marginTop: 16 },
-  commentsSectionTitle: { fontSize: 15, fontWeight: '600', color: '#333', marginBottom: 12 },
-
-  commentItem: { marginBottom: 8 },
-  commentNested: { marginLeft: 34, marginTop: 4 },
-  commentRow: { flexDirection: 'row', gap: 8 },
+  commentsSection: { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
+  commentItem: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  commentNested: { marginLeft: 36, marginBottom: 6 },
   commentContent: { flex: 1 },
   commentAuthor: { fontSize: 13, color: '#4A90D9', fontWeight: '500' },
-  commentText: { fontSize: 14, color: '#333', marginTop: 1 },
-  commentActions: { flexDirection: 'row', gap: 12, marginTop: 2 },
+  commentText: { fontSize: 14, color: '#333', marginTop: 1, lineHeight: 20 },
+  commentActions: { flexDirection: 'row', gap: 12, marginTop: 3 },
   commentTime: { fontSize: 11, color: '#bbb' },
   commentActionText: { fontSize: 12, color: '#4A90D9' },
-  expandBtn: { paddingVertical: 4, paddingLeft: 34 },
+  expandBtn: { paddingVertical: 4, paddingLeft: 36 },
   expandBtnText: { fontSize: 13, color: '#4A90D9' },
 
-  inputBar: { borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff' },
-  inputBarRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 8, gap: 6 },
-  inputBarReply: { paddingHorizontal: 14, paddingBottom: 6 },
-  inputBarReplyText: { fontSize: 12, color: '#999' },
-  inputField: { flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 15 },
-  sendBtn: { paddingHorizontal: 14, paddingVertical: 8 },
-  sendBtnText: { fontSize: 15, color: '#4A90D9', fontWeight: '500' },
+  inputBar: { borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff', paddingBottom: 4 },
+  inputBarReply: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 6, gap: 8 },
+  inputBarReplyText: { flex: 1, fontSize: 12, color: '#999' },
+  inputBarRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, gap: 8 },
+  inputField: { flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 15, color: '#333' },
+  sendBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#4A90D9', justifyContent: 'center', alignItems: 'center' },
 
-  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
-  errorText: { fontSize: 16, color: '#999', marginTop: 8 },
-  backBtn: { marginTop: 8, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: '#4A90D9', borderRadius: 6 },
-  backBtnText: { color: '#fff', fontSize: 15 },
+  previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  previewImage: { width: SCREEN_WIDTH, height: SCREEN_WIDTH },
 });
