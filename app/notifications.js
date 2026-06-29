@@ -63,11 +63,8 @@ export default function NotificationCenter() {
         onPress={() => {
           if (data.momentId) {
             router.push({ 
-              pathname: '/(tabs)/moments', 
-              params: { 
-                scrollToMoment: data.momentId.toString(),
-                commentId: data.commentId?.toString() || ''
-              } 
+              pathname: '/moment-detail', 
+              params: { momentId: data.momentId.toString() }
             });
           } else {
             router.push('/(tabs)/moments');

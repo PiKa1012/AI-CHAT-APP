@@ -158,11 +158,11 @@ export default function MapDebugScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Ionicons name="map" size={24} color="#4A90D9" />
-        <Text style={styles.title}>地图API调试</Text>
+        <Text style={styles.title}>地图接口调试</Text>
         {amapKey ? (
-          <Text style={styles.keyBadge}>Key 已配置</Text>
+          <Text style={styles.keyBadge}>密钥已配置</Text>
         ) : (
-          <Text style={styles.keyBadgeWarn}>未配置 Key</Text>
+          <Text style={styles.keyBadgeWarn}>未配置密钥</Text>
         )}
       </View>
 

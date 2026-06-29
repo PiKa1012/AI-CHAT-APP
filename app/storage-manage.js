@@ -7,6 +7,7 @@ import { SafeAvatar } from '../src/components/SafeImage';
 
 const STORAGE_FOLDERS = [
   { id: 'avatars', name: '头像', icon: 'person', color: '#4A90D9' },
+  { id: 'covers', name: '朋友圈背景', icon: 'image', color: '#3b82c4' },
   { id: 'emojis', name: '表情包', icon: 'happy', color: '#E6A23C' },
   { id: 'backgrounds', name: '聊天背景', icon: 'image', color: '#67C23A' },
   { id: 'chat_images', name: '聊天图片', icon: 'images', color: '#9B59B6' },
@@ -517,6 +518,17 @@ export default function StorageManageScreen() {
                 </View>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#F56C6C" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.clearItem} onPress={handleFixConflicts}>
+              <View style={styles.clearItemLeft}>
+                <Ionicons name="bandage" size={20} color="#E6A23C" />
+                <View style={styles.clearItemText}>
+                  <Text style={styles.clearItemTitle}>修复数据冲突</Text>
+                  <Text style={styles.clearItemDesc}>修复AI角色ID与用户ID冲突</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ccc" />
             </TouchableOpacity>
           </View>
         )}

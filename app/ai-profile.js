@@ -1,10 +1,12 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Modal, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useAppStore } from '../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useCallback } from 'react';
 import { getAIMood, getMoodInfo } from '../src/services/emotion';
 import { SafeAvatar } from '../src/components/SafeImage';
+import { loadSetting } from '../src/services/settings';
+import * as ImagePicker from 'expo-image-picker';
 
 const GENDER_MAP = { '男': '♂', '女': '♀', '其他': '⚪' };
 
@@ -13,6 +15,7 @@ export default function AIProfileScreen() {
   const { id } = useLocalSearchParams();
   const aiCharacters = useAppStore(s => s.aiCharacters);
   const conversations = useAppStore(s => s.conversations);
+  const updateAICharacter = useAppStore(s => s.updateAICharacter);
   
   const [mood, setMood] = useState(null);
   const [previewAvatar, setPreviewAvatar] = useState(null);
@@ -32,6 +35,16 @@ export default function AIProfileScreen() {
       const moodData = await getAIMood(parseInt(id));
       setMood(moodData);
     } catch (e) {}
+  };
+
+  const pickCoverBg = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (!result.canceled && ai) {
+      await updateAICharacter(ai.id, { coverBg: result.assets[0].uri });
+    }
   };
 
   const getAvatarColor = (id) => {
@@ -177,6 +190,22 @@ export default function AIProfileScreen() {
             <Text style={styles.infoValue}>{ai.voice_id}</Text>
           </View>
         )}
+        <TouchableOpacity style={styles.infoRow} onPress={() => router.push({ pathname: '/(tabs)/moments', params: { filterAuthor: ai.id.toString() } })}>
+          <Ionicons name="images" size={18} color="#4A90D9" />
+          <Text style={styles.infoLabel}>朋友圈</Text>
+          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.infoValue}>查看TA的动态</Text>
+            <Ionicons name="chevron-forward" size={16} color="#ccc" />
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.infoRow} onPress={pickCoverBg}>
+          <Ionicons name="image" size={18} color="#E6A23C" />
+          <Text style={styles.infoLabel}>封面</Text>
+          <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={styles.infoValue}>{ai.coverBg ? '点击更换封面' : '设置朋友圈封面'}</Text>
+            <Ionicons name="chevron-forward" size={16} color="#ccc" />
+          </View>
+        </TouchableOpacity>
       </View>
 
       {ai.description && (

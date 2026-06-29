@@ -36,7 +36,8 @@ async function initDatabase(database) {
       likes TEXT,
       speaking_style TEXT,
       relationship TEXT,
-      greeting TEXT
+      greeting TEXT,
+      coverBg TEXT
     );
 
     CREATE TABLE IF NOT EXISTS conversations (
