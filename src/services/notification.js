@@ -46,7 +46,7 @@ export async function sendLocalNotification(title, body, data = {}) {
     trigger: null,
   });
 
-  const persistableTypes = ['like', 'comment', 'reply', 'moment', 'diary', 'group_chat'];
+  const persistableTypes = ['like', 'comment', 'reply', 'moment'];
   if (persistableTypes.includes(data.type)) {
     try {
       await executeInsert(
