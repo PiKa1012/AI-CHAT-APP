@@ -12,6 +12,13 @@ export const MOOD_TAGS = [
   { id: 'love', name: '喜欢', icon: '🥰' },
   { id: 'excited', name: '兴奋', icon: '🤩' },
   { id: 'calm', name: '平静', icon: '😌' },
+  { id: 'lonely', name: '孤独', icon: '🥺' },
+  { id: 'surprised', name: '惊喜', icon: '😲' },
+  { id: 'bored', name: '无聊', icon: '😑' },
+  { id: 'anxious', name: '焦虑', icon: '😰' },
+  { id: 'proud', name: '自豪', icon: '😤' },
+  { id: 'grateful', name: '感激', icon: '🙏' },
+  { id: 'disappointed', name: '失望', icon: '😞' },
   { id: 'funny', name: '搞笑', icon: '😂' },
   { id: 'general', name: '通用', icon: '👍' },
 ];

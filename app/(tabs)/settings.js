@@ -99,6 +99,7 @@ export default function SettingsScreen() {
           color="#67C23A"
           onPress={() => router.push('/wechat-connect')}
         />
+
         <SettingItem
           icon="key"
           title="API配置"

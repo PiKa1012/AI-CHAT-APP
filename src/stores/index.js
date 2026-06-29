@@ -79,24 +79,28 @@ export const useAppStore = create((set, get) => ({
     await executeUpdate('DELETE FROM conversation_members WHERE conversation_id = ?', [conversationId]);
     await executeUpdate('DELETE FROM conversations WHERE id = ?', [conversationId]);
     set((state) => ({
-      conversations: state.conversations.filter(c => c.id !== conversationId)
+      conversations: state.conversations.filter(c => c.id !== conversationId),
+      currentConversation: state.currentConversation?.id === conversationId ? null : state.currentConversation,
     }));
   },
 
   clearConversationMessages: async (conversationId) => {
     await executeUpdate('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
-    set({ messages: [] });
+    set((state) => ({
+      messages: state.messages.filter(m => m.conversation_id !== conversationId),
+    }));
+    await get().loadConversations();
   },
 
   clearAllMessages: async () => {
     await executeUpdate('DELETE FROM messages');
     set({ messages: [] });
+    await get().loadConversations();
   },
 
   clearAllMoments: async () => {
     await executeUpdate('DELETE FROM moment_comments');
     await executeUpdate('DELETE FROM moments');
-    await executeUpdate('DELETE FROM notifications');
     set({ moments: [] });
   },
 
@@ -114,7 +118,12 @@ export const useAppStore = create((set, get) => ({
     await executeUpdate('DELETE FROM ai_memories');
     await executeUpdate('DELETE FROM scheduled_tasks');
     await executeUpdate('DELETE FROM notifications');
-    set({ messages: [], moments: [] });
+    await executeUpdate('DELETE FROM conversation_members');
+    await executeUpdate('DELETE FROM conversations');
+    set({ messages: [], moments: [], conversations: [], currentConversation: null });
+    await get().loadAICharacters();
+    await get().loadConversations();
+    await get().loadScheduledTasks();
   },
 
 
@@ -232,7 +241,7 @@ export const useAppStore = create((set, get) => ({
       'INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       [conversationId, senderType, senderId, content, messageType, utcStr]
     );
-    const message = { id, conversation_id: conversationId, sender_type: senderType, sender_id: senderId, content, message_type: messageType, created_at: utcStr };
+    const message = { id, conversation_id: conversationId, sender_type: senderType, sender_id: senderId, content, message_type: messageType, media_url: null, is_read: 0, created_at: utcStr };
     set((state) => ({ messages: [...state.messages, message] }));
     return id;
   },
@@ -257,6 +266,14 @@ export const useAppStore = create((set, get) => ({
     );
     await get().loadMoments();
     return id;
+  },
+
+  deleteMoment: async (momentId) => {
+    await executeUpdate('DELETE FROM moment_comments WHERE moment_id = ?', [momentId]);
+    await executeUpdate('DELETE FROM moments WHERE id = ?', [momentId]);
+    set((state) => ({
+      moments: state.moments.filter(m => m.id !== momentId),
+    }));
   },
 
   commentOnMoment: async (momentId, authorType, authorId, content, parentId = null) => {
@@ -317,6 +334,7 @@ export const useAppStore = create((set, get) => ({
       user: get().user,
       aiCharacters: await executeQuery('SELECT * FROM ai_characters'),
       conversations: await executeQuery('SELECT * FROM conversations'),
+      conversationMembers: await executeQuery('SELECT * FROM conversation_members'),
       messages: await executeQuery('SELECT * FROM messages'),
       moments: await executeQuery('SELECT * FROM moments'),
       momentComments: await executeQuery('SELECT * FROM moment_comments'),
@@ -330,6 +348,10 @@ export const useAppStore = create((set, get) => ({
     const data = JSON.parse(jsonString);
     const database = await getDatabase();
     
+    if (data.user) {
+      set({ user: data.user });
+    }
+    
     await database.withTransactionAsync(async () => {
       await executeUpdate('DELETE FROM moment_comments');
       await executeUpdate('DELETE FROM moments');
@@ -342,8 +364,8 @@ export const useAppStore = create((set, get) => ({
 
       for (const char of data.aiCharacters || []) {
         await executeInsert(
-          'INSERT INTO ai_characters (id, name, avatar, personality, description, voice_id, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [char.id, char.name, char.avatar, char.personality, char.description, char.voice_id, char.is_active]
+          'INSERT INTO ai_characters (id, name, avatar, personality, description, voice_id, age, gender, background, likes, speaking_style, relationship, greeting, coverBg, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [char.id, char.name, char.avatar, char.personality, char.description, char.voice_id, char.age, char.gender, char.background, char.likes, char.speaking_style, char.relationship, char.greeting, char.coverBg, char.is_active]
         );
       }
       for (const conv of data.conversations || []) {
@@ -366,14 +388,26 @@ export const useAppStore = create((set, get) => ({
       }
       for (const comment of data.momentComments || []) {
         await executeInsert(
-          'INSERT INTO moment_comments (id, moment_id, author_type, author_id, content, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-          [comment.id, comment.moment_id, comment.author_type, comment.author_id, comment.content, comment.created_at]
+          'INSERT INTO moment_comments (id, moment_id, author_type, author_id, content, parent_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [comment.id, comment.moment_id, comment.author_type, comment.author_id, comment.content, comment.parent_id, comment.created_at]
         );
       }
       for (const task of data.scheduledTasks || []) {
         await executeInsert(
-          'INSERT INTO scheduled_tasks (id, ai_id, task_type, content, schedule_time, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-          [task.id, task.ai_id, task.task_type, task.content, task.schedule_time, task.is_active]
+          'INSERT INTO scheduled_tasks (id, ai_id, task_type, content, schedule_time, repeat_type, execute_date, executed_count, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [task.id, task.ai_id, task.task_type, task.content, task.schedule_time, task.repeat_type, task.execute_date, task.executed_count, task.is_active, task.created_at]
+        );
+      }
+      for (const memory of data.aiMemories || []) {
+        await executeInsert(
+          'INSERT INTO ai_memories (id, ai_id, memory_type, content, importance, context, last_accessed, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [memory.id, memory.ai_id, memory.memory_type, memory.content, memory.importance, memory.context, memory.last_accessed, memory.created_at]
+        );
+      }
+      for (const member of data.conversationMembers || []) {
+        await executeInsert(
+          'INSERT INTO conversation_members (id, conversation_id, member_type, member_id, joined_at) VALUES (?, ?, ?, ?, ?)',
+          [member.id, member.conversation_id, member.member_type, member.member_id, member.joined_at]
         );
       }
     });

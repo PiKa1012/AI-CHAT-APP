@@ -798,7 +798,7 @@ export default function ChatScreen() {
               <Image source={{ uri: item.image_uri }} style={styles.emojiImage} />
             </TouchableOpacity>
           )}
-          keyExtractor={(item, i) => (item.id != null ? item.id : `item-${i}`).toString()}
+          keyExtractor={(item, i) => `${item?.id ?? i}-emoji-${i}`}
           numColumns={5}
           contentContainerStyle={styles.emojiGrid}
           ListEmptyComponent={
@@ -838,7 +838,7 @@ export default function ChatScreen() {
         </View>
         <FlatList
           data={groupMembers}
-          keyExtractor={(item, i) => (item.id != null ? item.id : `item-${i}`).toString()}
+          keyExtractor={(item, i) => `${item?.id ?? i}-member-${i}`}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.memberItem}
@@ -881,7 +881,7 @@ export default function ChatScreen() {
         data={[...messages].reverse()}
         inverted
         renderItem={renderMessage}
-        keyExtractor={(item, index) => (item.id != null ? item.id : `msg-${index}`).toString()}
+        keyExtractor={(item, index) => `${item?.id ?? index}-msg-${index}`}
         contentContainerStyle={styles.messagesContent}
         style={[styles.messagesContainer, !isReady && { opacity: 0 }]}
         onContentSizeChange={handleContentSizeChange}
@@ -1148,7 +1148,7 @@ export default function ChatScreen() {
             )}
             <FlatList
               data={musicResults}
-              keyExtractor={(item, i) => (item.id != null ? `${item.id}-${i}` : `music-${i}`)}
+              keyExtractor={(item, i) => `${item?.id ?? i}-music-${i}`}
               renderItem={({ item, index }) => (
                 <TouchableOpacity style={styles.musicResultItem} onPress={() => handleMusicPlay(item)}>
                   <Image

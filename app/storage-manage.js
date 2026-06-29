@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import * as FileSystem from 'expo-file-system';
 import { useAppStore } from '../src/stores';
+import { executeQuery, executeUpdate } from '../src/database';
 import { SafeAvatar } from '../src/components/SafeImage';
 
 const STORAGE_FOLDERS = [
@@ -304,6 +305,48 @@ export default function StorageManageScreen() {
               Alert.alert('成功', `"${conv.name}"的聊天记录已清除`);
             } catch (e) {
               Alert.alert('错误', '清除失败');
+            }
+          }
+        },
+      ]
+    );
+  };
+
+  const handleFixConflicts = () => {
+    Alert.alert(
+      '修复数据冲突',
+      '将AI角色ID重新分配至10000以上区间，避免与用户ID冲突。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '开始修复',
+          onPress: async () => {
+            try {
+              const chars = await executeQuery('SELECT * FROM ai_characters WHERE id < 10000 AND is_active = 1');
+              if (chars.length === 0) {
+                Alert.alert('提示', '没有发现ID冲突的AI角色');
+                return;
+              }
+              const maxResult = await executeQuery('SELECT COALESCE(MAX(id), 9999) + 1 as nextId FROM ai_characters');
+              let nextId = Math.max(maxResult[0]?.nextId || 10000, 10000);
+              for (const char of chars) {
+                const oldId = char.id;
+                const newId = nextId++;
+                await executeUpdate('UPDATE ai_characters SET id = ? WHERE id = ?', [newId, oldId]);
+                await executeUpdate('UPDATE conversation_members SET member_id = ? WHERE member_type = ? AND member_id = ?', [newId, 'ai', oldId]);
+                await executeUpdate('UPDATE messages SET sender_id = ? WHERE sender_type = ? AND sender_id = ?', [newId, 'ai', oldId]);
+                await executeUpdate('UPDATE moments SET author_id = ? WHERE author_type = ? AND author_id = ?', [newId, 'ai', oldId]);
+                await executeUpdate('UPDATE moment_comments SET author_id = ? WHERE author_type = ? AND author_id = ?', [newId, 'ai', oldId]);
+                await executeUpdate('UPDATE diaries SET ai_id = ? WHERE ai_id = ?', [newId, oldId]);
+                await executeUpdate('UPDATE diary_comments SET author_id = ? WHERE author_type = ? AND author_id = ?', [newId, 'ai', oldId]);
+                await executeUpdate('UPDATE ai_moods SET ai_id = ? WHERE ai_id = ?', [newId, oldId]);
+                await executeUpdate('UPDATE ai_memories SET ai_id = ? WHERE ai_id = ?', [newId, oldId]);
+                await executeUpdate('UPDATE scheduled_tasks SET ai_id = ? WHERE ai_id = ?', [newId, oldId]);
+              }
+              await loadDbInfo();
+              Alert.alert('成功', `已修复 ${chars.length} 个AI角色的ID冲突`);
+            } catch (e) {
+              Alert.alert('错误', '修复失败：' + e.message);
             }
           }
         },
