@@ -1,7 +1,7 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
-import { getUsageStats, getDeepSeekBalance, getBalanceInfo } from '../src/services/usage';
+import { getUsageStats, getBalance, formatBalanceInfo } from '../src/services/usage';
 import { loadSetting } from '../src/services/settings';
 
 export default function UsageStatsScreen() {
@@ -16,29 +16,31 @@ export default function UsageStatsScreen() {
     return s;
   };
 
-  const loadBalance = async () => {
+  const loadBalance = async (provider) => {
     const apiSettings = await loadSetting('api_settings', {});
     const key = apiSettings.apiKey;
-    if (!key || apiSettings.provider !== 'deepseek') {
+    if (!key) { setBalance('no_key'); return; }
+    const currentProvider = provider || apiSettings.provider;
+    if (currentProvider !== 'deepseek') {
       setBalance('unsupported');
       return;
     }
-    const raw = await getDeepSeekBalance(key);
-    setBalance(raw ? getBalanceInfo(raw) : 'error');
+    const raw = await getBalance(currentProvider, key);
+    setBalance(raw ? formatBalanceInfo(currentProvider, raw) : 'error');
   };
 
   useEffect(() => {
     (async () => {
-      await loadStats();
-      await loadBalance();
+      const s = await loadStats();
+      await loadBalance(s.provider);
       setLoading(false);
     })();
   }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadStats();
-    await loadBalance();
+    const s = await loadStats();
+    await loadBalance(s.provider);
     setRefreshing(false);
   };
 
@@ -58,13 +60,9 @@ export default function UsageStatsScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>API 余额</Text>
-        {balance === 'unsupported' ? (
-          <Text style={styles.hint}>仅 DeepSeek 支持余额查询</Text>
-        ) : balance === 'error' ? (
-          <Text style={styles.hint}>查询失败，请检查 API Key</Text>
-        ) : balance ? (
+      {balance && balance !== 'no_key' && balance !== 'unsupported' && balance !== 'error' ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>API 余额</Text>
           <View style={styles.balanceCard}>
             <Text style={styles.balanceAmount}>¥{balance.total}</Text>
             <Text style={styles.balanceLabel}>可用余额</Text>
@@ -74,10 +72,18 @@ export default function UsageStatsScreen() {
               </Text>
             )}
           </View>
-        ) : (
-          <Text style={styles.hint}>点击刷新查询余额</Text>
-        )}
-      </View>
+        </View>
+      ) : balance === 'unsupported' ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>API 余额</Text>
+          <Text style={styles.hint}>当前服务商 ({stats?.provider || '未知'}) 不支持余额查询</Text>
+        </View>
+      ) : balance === 'error' ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>API 余额</Text>
+          <Text style={styles.hint}>余额查询失败，请检查 API Key 是否正确</Text>
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>今日用量</Text>
@@ -95,10 +101,21 @@ export default function UsageStatsScreen() {
           <StatBox icon="arrow-up" label="输入 Token" value={formatNum(stats.totalPrompt)} color="#4A90D9" />
           <StatBox icon="arrow-down" label="输出 Token" value={formatNum(stats.totalCompletion)} color="#67C23A" />
         </View>
-        <View style={styles.costRow}>
-          <Ionicons name="cash" size={16} color="#999" />
-          <Text style={styles.costText}>预估费用 ¥{stats.estimatedCost.toFixed(4)}</Text>
-          <Text style={styles.costHint}>（以 DeepSeek $0.5/1M tokens 估算）</Text>
+        {stats.estimatedCost ? (
+          <View style={styles.costRow}>
+            <Ionicons name="cash" size={16} color="#999" />
+            <Text style={styles.costText}>
+              预估费用 {stats.estimatedCost.currency === 'CNY' ? '¥' : '$'}{stats.estimatedCost.amount}
+            </Text>
+            <Text style={styles.costHint}>（按 {stats.estimatedCost.label} 定价估算）</Text>
+          </View>
+        ) : (
+          <View style={styles.costRow}>
+            <Text style={styles.costHint}>无法估算费用（未知服务商）</Text>
+          </View>
+        )}
+        <View style={styles.providerRow}>
+          <Text style={styles.providerText}>服务商：{stats.provider || '未知'}</Text>
         </View>
       </View>
 
@@ -143,6 +160,8 @@ const styles = StyleSheet.create({
   costRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16, gap: 4 },
   costText: { fontSize: 13, color: '#666' },
   costHint: { fontSize: 11, color: '#ccc' },
+  providerRow: { alignItems: 'center', marginTop: 4 },
+  providerText: { fontSize: 12, color: '#bbb' },
   refreshBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 16, gap: 6, padding: 12 },
   refreshText: { fontSize: 14, color: '#4A90D9' },
 });
