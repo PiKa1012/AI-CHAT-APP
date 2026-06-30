@@ -1,86 +1,11 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
-import { getBeijingNow, getBeijingToday } from '../utils/time';
+import { getCurrentTimeInfo, getBeijingToday } from '../utils/time';
 import { getAPISettings, loadSetting } from './settings';
 import { generateDiaryImage } from './imageGen';
-import { trackUsage, extractCachedTokens } from './usage';
-
-async function callAIAPI(messages, systemPrompt = '') {
-  const settings = await getAPISettings();
-  if (!settings?.apiKey) throw new Error('未配置API Key');
-
-  const provider = settings.provider || 'openai';
-  let baseUrl = settings.apiBaseUrl || getDefaultBaseUrl(provider);
-  let model = settings.modelName || getDefaultModel(provider);
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${settings.apiKey}`,
-  };
-
-  const apiMessages = [];
-  if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
-  apiMessages.push(...messages);
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ model, messages: apiMessages, max_tokens: 4096, temperature: 0.8 }),
-    signal: controller.signal,
-  });
-  clearTimeout(timeout);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API错误 (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json();
-  if (data.usage) {
-    trackUsage({
-      promptTokens: data.usage.prompt_tokens,
-      completionTokens: data.usage.completion_tokens,
-      totalTokens: data.usage.total_tokens,
-      cachedTokens: extractCachedTokens(data.usage),
-      model,
-      provider: settings.provider || 'unknown',
-      endpoint: 'diary',
-    });
-  }
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('API返回数据格式错误');
-  return content;
-}
-
-function getDefaultBaseUrl(provider) {
-  const urls = { openai: 'https://api.openai.com', deepseek: 'https://api.deepseek.com', qwen: 'https://dashscope.aliyuncs.com/compatible-mode' };
-  return urls[provider] || '';
-}
-
-function getDefaultModel(provider) {
-  const models = { openai: 'gpt-3.5-turbo', deepseek: 'deepseek-chat', qwen: 'qwen-turbo' };
-  return models[provider] || '';
-}
-
-function getCurrentTimeInfo() {
-  const now = getBeijingNow();
-  const year = now.year;
-  const month = now.month;
-  const day = now.day;
-  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-  const weekDay = weekDays[now.date.getUTCDay()];
-  const hour = now.hours;
-
-  return {
-    full: `${year}年${month}月${day}日 星期${weekDay}`,
-    date: getBeijingToday(),
-    hour,
-  };
-}
+import { callAIAPI } from './api-client';
 
 export async function getTodayContext(aiId) {
-  const timeInfo = getCurrentTimeInfo();
+  const today = getBeijingToday();
   
   const messages = await executeQuery(
     `SELECT content, sender_type FROM messages 
@@ -88,17 +13,17 @@ export async function getTodayContext(aiId) {
        SELECT conversation_id FROM conversation_members WHERE member_id = ?
      ))
      ORDER BY created_at DESC LIMIT 20`,
-    [timeInfo.date, aiId]
+    [today, aiId]
   );
 
   const moments = await executeQuery(
     "SELECT content FROM moments WHERE created_at >= ? AND author_type = 'user' ORDER BY created_at DESC LIMIT 5",
-    [timeInfo.date]
+    [today]
   );
 
   const comments = await executeQuery(
     'SELECT content FROM moment_comments WHERE created_at >= ? ORDER BY created_at DESC LIMIT 5',
-    [timeInfo.date]
+    [today]
   );
 
   return {
@@ -139,7 +64,7 @@ export async function generateDiary(aiId, style = 'normal') {
 
   const lastDiary = await executeQuery(
     "SELECT title, content FROM diaries WHERE ai_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT 1",
-    [aiId, timeInfo.date]
+    [aiId, getBeijingToday()]
   );
 
   let avoidRepeat = '';
@@ -165,7 +90,7 @@ ${contextText}${avoidRepeat}
 
 只输出以上格式，不要其他解释。`;
 
-  const result = await callAIAPI([{ role: 'user', content: '请写今天的日记' }], prompt);
+  const result = await callAIAPI([{ role: 'user', content: '请写今天的日记' }], prompt, { max_tokens: 4096, temperature: 0.8, endpoint: 'diary' });
   
   const titleMatch = result.match(/标题[：:]\s*(.+)/);
   const contentMatch = result.match(/内容[：:]\s*([\s\S]+?)(?=\n心情[：:]|\n天气[：:]|$)/);
@@ -225,13 +150,23 @@ export async function getDiaries(aiId = null, offset = 0) {
   const hasMore = diaries.length > PAGE_SIZE;
   if (hasMore) diaries.pop();
 
-  for (let diary of diaries) {
-    diary.comments = await executeQuery(
-      'SELECT * FROM diary_comments WHERE diary_id = ? ORDER BY created_at ASC',
-      [diary.id]
+  if (diaries.length > 0) {
+    const ids = diaries.map(d => d.id);
+    const placeholders = ids.map(() => '?').join(',');
+    const allComments = await executeQuery(
+      `SELECT * FROM diary_comments WHERE diary_id IN (${placeholders}) ORDER BY created_at ASC`,
+      ids
     );
-    diary.tags = JSON.parse(diary.tags || '[]');
-    diary.images = JSON.parse(diary.images || '[]');
+    const commentsByDiary = {};
+    for (const c of allComments) {
+      if (!commentsByDiary[c.diary_id]) commentsByDiary[c.diary_id] = [];
+      commentsByDiary[c.diary_id].push(c);
+    }
+    for (let diary of diaries) {
+      diary.comments = commentsByDiary[diary.id] || [];
+      diary.tags = JSON.parse(diary.tags || '[]');
+      diary.images = JSON.parse(diary.images || '[]');
+    }
   }
 
   return { diaries, hasMore };
@@ -313,7 +248,7 @@ export async function aiReplyToDiaryComment(diaryId, userComment) {
 请用第一人称回复${userName}的这条回应，语气自然真诚，像朋友聊天一样。
 只输出回复内容，不要加引号。`;
 
-    const reply = await callAIAPI([{ role: 'user', content: '回复用户' }], prompt);
+    const reply = await callAIAPI([{ role: 'user', content: '回复用户' }], prompt, { max_tokens: 4096, temperature: 0.8, endpoint: 'diary' });
     if (reply) {
       await executeInsert(
         'INSERT INTO diary_comments (diary_id, author_type, author_id, content) VALUES (?, ?, ?, ?)',

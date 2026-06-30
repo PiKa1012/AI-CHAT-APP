@@ -201,7 +201,7 @@ async function initDatabase(database) {
     );
   `);
 
-  try { await database.execAsync('ALTER TABLE api_usage ADD COLUMN cached_tokens INTEGER DEFAULT 0'); } catch (e) {}
+  try { await database.execAsync('ALTER TABLE api_usage ADD COLUMN cached_tokens INTEGER DEFAULT 0'); } catch (e) { /* 列可能已存在，忽略 */ }
 }
 
 export async function executeQuery(sql, params = []) {

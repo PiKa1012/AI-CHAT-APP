@@ -6,6 +6,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { formatTime, formatDate } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
+import { executeQuery, executeUpdate } from '../../src/database';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -35,7 +36,6 @@ export default function HomeScreen() {
   };
 
   const checkUnreadMessages = async () => {
-    const { executeQuery } = require('../../src/database');
     const unreads = await executeQuery(
       'SELECT conversation_id, COUNT(*) as count FROM messages WHERE is_read = 0 AND sender_type = "ai" GROUP BY conversation_id'
     );
@@ -93,7 +93,6 @@ export default function HomeScreen() {
   };
 
   const openConversation = async (conv) => {
-    const { executeUpdate } = require('../../src/database');
     await executeUpdate(
       'UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = "ai"',
       [conv.id]

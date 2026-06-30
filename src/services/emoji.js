@@ -43,7 +43,9 @@ export async function deleteEmojiPack(packId) {
   for (const emoji of emojis) {
     try {
       await FileSystem.deleteAsync(emoji.image_uri, { idempotent: true });
-    } catch (e) {}
+    } catch (e) {
+      console.warn('删除表情文件失败:', e?.message);
+    }
   }
   await executeUpdate('DELETE FROM emoji_packs WHERE id = ?', [packId]);
 }
@@ -110,7 +112,9 @@ export async function deleteEmoji(emojiId) {
   if (emoji.length > 0) {
     try {
       await FileSystem.deleteAsync(emoji[0].image_uri, { idempotent: true });
-    } catch (e) {}
+    } catch (e) {
+      console.warn('删除自定义表情文件失败:', e?.message);
+    }
     await executeUpdate('DELETE FROM custom_emojis WHERE id = ?', [emojiId]);
   }
 }

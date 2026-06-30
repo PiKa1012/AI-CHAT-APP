@@ -1,6 +1,5 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
-import { getAPISettings } from './settings';
-import { trackUsage, extractCachedTokens } from './usage';
+import { callAIAPI } from './api-client';
 
 const EMOTIONS = {
   happy: { name: '开心', emoji: '😊', valence: 1 },
@@ -36,7 +35,9 @@ export async function getAIMood(aiId) {
     if (result.length > 0) {
       return result[0];
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('获取AI心情失败:', e?.message);
+  }
 
   await executeInsert(
     'INSERT INTO ai_moods (ai_id, mood, energy, affection, stress, confidence) VALUES (?, ?, ?, ?, ?, ?)',
@@ -67,13 +68,13 @@ function clamp(value, min, max) {
 }
 
 export async function analyzeAndUpdateMood(aiId, userMessage, aiResponse, character) {
+  const currentMood = await getAIMood(aiId);
+  
   try {
-    const currentMood = await getAIMood(aiId);
-    
     const analysis = await analyzeEmotionWithLLM(character, currentMood, userMessage, aiResponse);
     
     if (analysis) {
-      await updateAIMood(aiId, {
+      const updated = await updateAIMood(aiId, {
         mood: analysis.mood,
         energy: analysis.energy_change,
         affection: analysis.affection_change,
@@ -84,16 +85,17 @@ export async function analyzeAndUpdateMood(aiId, userMessage, aiResponse, charac
       if (analysis.memory) {
         await saveEmotionMemory(aiId, analysis.memory, analysis.mood);
       }
+      
+      return updated;
     }
   } catch (error) {
     console.error('情绪分析失败:', error);
   }
+  
+  return currentMood;
 }
 
 async function analyzeEmotionWithLLM(character, currentMood, userMessage, aiResponse) {
-  const settings = await getAPISettings();
-  if (!settings?.apiKey) return null;
-
   const personality = character.personality || '友好';
   const name = character.name;
 
@@ -120,40 +122,11 @@ ${name}：${aiResponse}
 {"mood":"xxx","energy_change":0,"affection_change":0,"stress_change":0,"confidence_change":0,"memory":""}`;
 
   try {
-    const provider = settings.provider || 'openai';
-    const baseUrl = settings.apiBaseUrl || getDefaultBaseUrl(provider);
-    const model = settings.modelName || getDefaultModel(provider);
-
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (data.usage) {
-      trackUsage({
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens,
-        cachedTokens: extractCachedTokens(data.usage),
-        model,
-        provider: settings.provider || 'unknown',
-        endpoint: 'emotion',
-      });
-    }
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return null;
+    const content = await callAIAPI(
+      [{ role: 'user', content: prompt }],
+      '',
+      { max_tokens: 200, temperature: 0.3, endpoint: 'emotion' }
+    );
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -164,24 +137,6 @@ ${name}：${aiResponse}
   }
   
   return null;
-}
-
-function getDefaultBaseUrl(provider) {
-  const urls = {
-    openai: 'https://api.openai.com',
-    deepseek: 'https://api.deepseek.com',
-    qwen: 'https://dashscope.aliyuncs.com/compatible-mode',
-  };
-  return urls[provider] || 'https://api.openai.com';
-}
-
-function getDefaultModel(provider) {
-  const models = {
-    openai: 'gpt-3.5-turbo',
-    deepseek: 'deepseek-chat',
-    qwen: 'qwen-turbo',
-  };
-  return models[provider] || 'gpt-3.5-turbo';
 }
 
 export async function saveEmotionMemory(aiId, content, mood) {

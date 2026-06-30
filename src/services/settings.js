@@ -23,7 +23,9 @@ export async function loadSetting(key, defaultValue = null) {
     if (result.length > 0) {
       return JSON.parse(result[0].value);
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('读取设置失败:', e?.message);
+  }
   return defaultValue;
 }
 

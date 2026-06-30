@@ -1,7 +1,7 @@
 import { getAPISettings } from './settings';
 import { createScheduledTask } from './scheduler';
 import { getBeijingNow } from '../utils/time';
-import { trackUsage, extractCachedTokens } from './usage';
+import { callAIAPI } from './api-client';
 
 export async function detectAndCreateTask(aiId, userMessage) {
   const settings = await getAPISettings();
@@ -59,39 +59,11 @@ export async function detectAndCreateTask(aiId, userMessage) {
 只输出JSON，不要其他文字。`;
 
   try {
-    const provider = settings.provider || 'openai';
-    const baseUrl = settings.apiBaseUrl || getDefaultBaseUrl(provider);
-    const model = settings.modelName || getDefaultModel(provider);
-
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${settings.apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 300,
-        temperature: 0.1,
-      }),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (data.usage) {
-      trackUsage({
-        promptTokens: data.usage.prompt_tokens,
-        completionTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens,
-        cachedTokens: extractCachedTokens(data.usage),
-        model,
-        provider: settings.provider || 'unknown',
-        endpoint: 'task_detector',
-      });
-    }
-    const content = data.choices?.[0]?.message?.content;
+    const content = await callAIAPI(
+      [{ role: 'user', content: prompt }],
+      '',
+      { max_tokens: 300, temperature: 0.1, endpoint: 'task_detector' }
+    );
     
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -122,24 +94,6 @@ export async function detectAndCreateTask(aiId, userMessage) {
   }
   
   return null;
-}
-
-function getDefaultBaseUrl(provider) {
-  const urls = {
-    openai: 'https://api.openai.com',
-    deepseek: 'https://api.deepseek.com',
-    qwen: 'https://dashscope.aliyuncs.com/compatible-mode',
-  };
-  return urls[provider] || 'https://api.openai.com';
-}
-
-function getDefaultModel(provider) {
-  const models = {
-    openai: 'gpt-3.5-turbo',
-    deepseek: 'deepseek-chat',
-    qwen: 'qwen-turbo',
-  };
-  return models[provider] || 'gpt-3.5-turbo';
 }
 
 export function getTaskTypeName(taskType) {

@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAvatar } from '../src/components/SafeImage';
 import { syncScheduledTasksToNotifications } from '../src/services/scheduler';
+import { executeQuery } from '../src/database';
 
 const TASK_TYPES = [
   { id: 'post_moment', name: '发朋友圈', icon: 'images', color: '#E6A23C' },
@@ -61,7 +62,6 @@ export default function ScheduledTasksScreen() {
   }, [newTask.content, newTask.task_type]);
 
   const loadGroupMembers = async (conversationId) => {
-    const { executeQuery } = require('../src/database');
     const members = await executeQuery(
       'SELECT * FROM conversation_members WHERE conversation_id = ?',
       [conversationId]
