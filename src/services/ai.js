@@ -8,6 +8,7 @@ import { getRelevantMemories, formatMemoriesForPrompt, extractMemories } from '.
 import { generateMomentImage } from './imageGen';
 import { sendLocalNotification } from './notification';
 import { trackUsage, extractCachedTokens } from './usage';
+import * as FileSystem from 'expo-file-system';
 
 export { clearAPISettingsCache as clearSettingsCache };
 
@@ -458,18 +459,39 @@ async function tryGetEmojiForResponse(character, responseText, currentMood) {
   }
 }
 
-export async function aiAutoPostMoment(aiId) {
+export async function aiAutoPostMoment(aiId, userRequest = null, recentMessages = []) {
   const ai = await executeQuery('SELECT * FROM ai_characters WHERE id = ?', [aiId]);
   if (ai.length === 0) throw new Error('AI角色不存在');
 
-  const prompt = getPersonalityPrompt(ai[0]) + '\n请发一条朋友圈，内容要自然真实，像普通人发的朋友圈。只输出内容，不要其他解释。';
-  const content = await callAIAPI([{ role: 'user', content: '发一条朋友圈' }], prompt);
+  const settings = await getAPISettings();
+  const hasImageGen = settings?.enableImageGen && settings?.enableMomentImage;
+  const userProfile = await loadSetting('user_profile', {});
+  const userName = userProfile.name || '你';
+
+  const userReq = userRequest ? `\n用户要求：${userRequest}` : '';
+  const chatContext = recentMessages.length > 0 && userRequest
+    ? '\n聊天记录：\n' + recentMessages.map(m =>
+        `${m.sender_type === 'user' ? userName : '你'}：${m.content}`
+      ).join('\n').slice(0, 10000)
+    : '';
+  const formatHint = hasImageGen
+    ? '内容：[朋友圈文字]\n配图：[一句话描述配图画面，包含人物、场景、物品]'
+    : '内容：[朋友圈文字]';
+  const prompt = getPersonalityPrompt(ai[0]) + `\n我的名字是${ai[0].name}，用户的名字是${userName}。
+请发一条朋友圈，内容要自然真实，像普通人发的朋友圈。用第一人称"我"来写，不要出现我自己的名字。${userReq}${chatContext}
+用以下格式输出：
+${formatHint}`;
+  const raw = await callAIAPI([{ role: 'user', content: '发一条朋友圈' }], prompt);
+
+  const content = (raw.match(/内容[：:](.+?)(?=\n|$)/)?.[1] || (hasImageGen ? raw.replace(/配图[：:][\s\S]*$/, '').trim() : raw.trim()));
+  const imageDesc = hasImageGen ? (raw.match(/配图[：:](.+?)(?=\n|$)/)?.[1] || '').trim() : '';
 
   let images = [];
-  const settings = await getAPISettings();
-  if (settings?.enableImageGen && settings?.enableMomentImage) {
+  if (hasImageGen) {
     try {
-      const imagePath = await generateMomentImage(content);
+      const imagePrompt = imageDesc || content;
+      const user = await loadSetting('user_profile', {});
+      const imagePath = await generateMomentImage(imagePrompt, ai[0], user);
       if (imagePath) {
         images = [imagePath];
       }
@@ -525,11 +547,32 @@ export async function aiCommentOnMoment(momentId, parentCommentId = null, userCo
     replyAI = ais[Math.floor(Math.random() * ais.length)];
   }
   
+  let momentText = moments[0].content || '';
+  const images = JSON.parse(moments[0].images || '[]');
+
+  let imageContext = '';
+  if (images.length > 0) {
+    const settings = await getAPISettings();
+    if (settings?.enableImageRecognition) {
+      try {
+        const base64 = await FileSystem.readAsStringAsync(images[0], {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const description = await analyzeImage(base64, '请用一句话描述这张图片的内容');
+        imageContext = `\n图片内容：${description}`;
+      } catch (e) {
+        imageContext = '\n这条朋友圈有图片';
+      }
+    } else {
+      imageContext = '\n这条朋友圈有图片';
+    }
+  }
+  
   let prompt;
   if (userComment) {
-    prompt = getPersonalityPrompt(replyAI) + `\n朋友圈内容："${moments[0].content}"\n用户说："${userComment}"\n请回复用户，要自然，像朋友互动。只输出回复内容，不要其他解释。`;
+    prompt = getPersonalityPrompt(replyAI) + `\n朋友圈内容："${momentText}"${imageContext}\n用户说："${userComment}"\n请回复用户，要自然，像朋友互动。只输出回复内容，不要其他解释。`;
   } else {
-    prompt = getPersonalityPrompt(replyAI) + `\n给这条朋友圈评论："${moments[0].content}"\n只输出评论内容，不要其他解释。`;
+    prompt = getPersonalityPrompt(replyAI) + `\n给这条朋友圈评论："${momentText}"${imageContext}\n只输出评论内容，不要其他解释。`;
   }
   
   const comment = await callAIAPI([{ role: 'user', content: userComment ? '回复用户' : '评论朋友圈' }], prompt);

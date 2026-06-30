@@ -20,11 +20,35 @@ export default function WechatConnectScreen() {
   const pollRef = useRef(null);
 
   useEffect(() => {
-    loadSetting('wechat_bridge', {}).then(s => {
+    loadSetting('wechat_bridge', {}).then(async s => {
       if (s.serverUrl) setServerUrl(s.serverUrl);
       if (s.aiId) setSelectedAI(s.aiId);
       if (s.connectedAI) setConnectedAI(s.connectedAI);
-      if (s.status) setStatus(s.status);
+      if (s.status === 'scanning' && s.serverUrl) {
+        setQrCode('restored');
+        try {
+          const res = await fetchWithTimeout(`${s.serverUrl}/api/bridge/status`, {}, 5000);
+          const data = await res.json();
+          if (data.status === 'running') {
+            setStatus('running');
+            setQrCode(null);
+            setConnectedAI(s.connectedAI || s.aiId);
+            await saveSetting('wechat_bridge', { serverUrl: s.serverUrl, status: 'running', connectedAI: s.connectedAI || s.aiId, aiId: s.aiId });
+          } else if (data.status === 'logging') {
+            startPolling();
+          } else {
+            setStatus('idle');
+            setQrCode(null);
+            await saveSetting('wechat_bridge', { serverUrl: s.serverUrl, status: 'idle' });
+          }
+        } catch {
+          setStatus('idle');
+          setQrCode(null);
+          await saveSetting('wechat_bridge', { serverUrl: s.serverUrl, status: 'idle' });
+        }
+      } else if (s.status) {
+        setStatus(s.status);
+      }
     });
   }, []);
 
@@ -117,6 +141,7 @@ export default function WechatConnectScreen() {
   };
 
   const startPolling = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetchWithTimeout(`${serverUrl.trim()}/api/bridge/status`, {}, 5000);

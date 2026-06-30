@@ -119,6 +119,30 @@ export async function getCurrentLocation() {
   return getLocationByIP();
 }
 
+async function ipApiFallback() {
+  try {
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), 5000);
+    const res = await fetch('http://ip-api.com/json/', { signal: c.signal });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== 'success') return null;
+    const lat = data.lat;
+    const lng = data.lon;
+    return {
+      source: 'ip-api',
+      city: data.city || '',
+      province: data.regionName || '',
+      lat: String(lat),
+      lng: String(lng),
+      location: `${lng},${lat}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getLocationByIP() {
   const data = await apiGet('/ip', {});
   const loc = data.location || '';
@@ -151,10 +175,25 @@ export async function getLocationByIP() {
       };
     }
   }
+
+  if (data.city || data.province) {
+    return {
+      source: 'ip',
+      city: data.city || '',
+      province: data.province || '',
+      lat: '',
+      lng: '',
+      location: '',
+    };
+  }
+
+  const fallback = await ipApiFallback();
+  if (fallback) return fallback;
+
   return {
     source: 'ip',
-    city: data.city || '',
-    province: data.province || '',
+    city: '',
+    province: '',
     lat: '',
     lng: '',
     location: '',

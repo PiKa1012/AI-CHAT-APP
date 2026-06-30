@@ -1,7 +1,7 @@
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { useAppStore } from '../../src/stores';
-import { getAIResponse, getGroupAIResponse, findMentionedAI, analyzeImage } from '../../src/services/ai';
+import { getAIResponse, getGroupAIResponse, findMentionedAI, analyzeImage, aiAutoPostMoment } from '../../src/services/ai';
 import { generateChatImage, isImageGenerationRequest, extractImageDescription } from '../../src/services/imageGen';
 import { detectAndCreateTask, getTaskTypeName } from '../../src/services/taskDetector';
 import { speakText, stopSpeaking, isSpeaking } from '../../src/services/voice';
@@ -399,6 +399,27 @@ export default function ChatScreen() {
       } catch (error) {
         console.error('检测定时任务失败:', error);
       }
+    }
+    
+    if (messageText.match(/发.*朋友圈/) && aiId) {
+      setIsTyping(true);
+      try {
+        const todayStart = new Date();
+        todayStart.setHours(todayStart.getHours() + 8);
+        const todayStr = todayStart.toISOString().slice(0, 10);
+        const todayMessages = messages.filter(m => {
+          const d = new Date(m.created_at);
+          d.setHours(d.getHours() + 8);
+          return d.toISOString().slice(0, 10) === todayStr;
+        });
+        const content = await aiAutoPostMoment(aiId, messageText, todayMessages);
+        const ai = aiCharacters.find(a => a.id === aiId);
+        await sendMessage(parseInt(id), 'ai', aiId, `发了条朋友圈~${content ? '\n\n' + content : ''}`);
+      } catch (error) {
+        await sendMessage(parseInt(id), 'ai', aiId, `发朋友圈失败了：${error.message}`);
+      }
+      setIsTyping(false);
+      return;
     }
     
     const mapIntent = detectMapIntent(messageText);

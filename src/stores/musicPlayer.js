@@ -39,7 +39,7 @@ export const useMusicPlayer = create((set, get) => ({
   restoreQueue: async () => {
     const data = await loadSetting('music_queue', null);
     if (data && data.queue && data.queue.length > 0) {
-      set({ queue: data.queue, currentIndex: data.currentIndex ?? -1, playMode: data.playMode || 'order', isVisible: true });
+      set({ queue: data.queue, currentIndex: data.currentIndex ?? -1, playMode: data.playMode || 'order', isVisible: false });
     }
   },
 

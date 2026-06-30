@@ -244,6 +244,9 @@ app.get('/api/bridge/status', (req, res) => {
 
 // 启动桥接
 app.post('/api/bridge/start', async (req, res) => {
+  // 清空旧的聊天记录，每次新连接都是全新会话
+  delete sessions['wechat'];
+
   const { apiKey, baseUrl, model, systemPrompt, maxTokens } = req.body;
   if (!apiKey) return res.status(400).json({ error: '缺少 apiKey' });
 
