@@ -72,7 +72,9 @@ export async function logDebug(tag, message, data) {
 export async function clearLogs() {
   try {
     await AsyncStorage.removeItem(LOG_KEY);
-  } catch (e) {}
+  } catch (e) {
+    console.warn('清除日志失败:', e?.message);
+  }
 }
 
 export async function getAllLogs() {

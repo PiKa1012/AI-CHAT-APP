@@ -467,7 +467,7 @@ export default function APISettingsScreen() {
           <View style={styles.switchInfo}>
             <Ionicons name="search" size={20} color="#4A90D9" />
             <Text style={styles.switchLabel}>联网搜索</Text>
-            <Text style={styles.switchDesc}>AI可搜索最新信息</Text>
+            <Text style={styles.switchDesc}>博查AI搜索最新信息</Text>
           </View>
           <Switch value={enableSearch} onValueChange={setEnableSearch} trackColor={{ true: '#4A90D9' }} />
         </View>
@@ -478,7 +478,7 @@ export default function APISettingsScreen() {
               style={styles.input}
               value={searchApiKey}
               onChangeText={setSearchApiKey}
-              placeholder="输入搜索服务API Key"
+              placeholder="输入博查搜索API Key"
               placeholderTextColor="#999"
             />
           </View>

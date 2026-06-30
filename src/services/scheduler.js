@@ -106,38 +106,6 @@ async function checkDueScheduledTasks() {
   }
 }
 
-async function checkAutoPostSettings() {
-  const settings = await getAutoPostSettings();
-  const now = getBeijingNow();
-  const currentHour = now.hours;
-  const currentMinute = now.minutes;
-
-  if (settings.autoMomentEnabled) {
-    const lastPost = lastAutoPostCheck ? new Date(lastAutoPostCheck) : null;
-    const hoursSinceLastPost = lastPost ? (Date.now() - lastPost.getTime()) / (1000 * 60 * 60) : Infinity;
-    
-    if (hoursSinceLastPost >= settings.autoMomentInterval) {
-      const startHour = 8;
-      const endHour = 23;
-      if (currentHour >= startHour && currentHour < endHour) {
-        await autoPostMoment();
-        lastAutoPostCheck = new Date().toISOString();
-      }
-    }
-  }
-
-  if (settings.autoDiaryEnabled) {
-    const [targetHour, targetMinute] = settings.autoDiaryTime.split(':').map(Number);
-    const lastDiary = lastAutoDiaryCheck ? new Date(lastAutoDiaryCheck) : null;
-    const isNewDay = !lastDiary || lastDiary.toDateString() !== now.toDateString();
-    
-    if (isNewDay && currentHour === targetHour && currentMinute >= targetMinute && currentMinute < targetMinute + 5) {
-      await autoWriteDiary();
-      lastAutoDiaryCheck = new Date().toISOString();
-    }
-  }
-}
-
 export async function executeScheduledTask(taskId) {
   const now = getBeijingNow();
   const today = `${now.year}-${now.month.toString().padStart(2, '0')}-${now.day.toString().padStart(2, '0')}`;

@@ -1,5 +1,6 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { getAPISettings } from './settings';
+import { callAIAPI } from './api-client';
 
 const MEMORY_TYPES = {
   FACT: 'fact',
@@ -54,7 +55,7 @@ export async function getRelevantMemories(aiId, query, limit = 10) {
   );
 
   if (memories.length < limit) {
-    const existingIds = memories.map(m => m.id);
+    const existingIds = memories.map(m => Number(m.id));
     const placeholders = existingIds.length > 0 
       ? `AND id NOT IN (${existingIds.join(',')})` 
       : '';
@@ -108,7 +109,7 @@ ${conversationText}
 如果对话中没有值得记忆的信息，输出空数组：[]
 只输出JSON，不要其他文字。`;
 
-    const response = await callMemoryAPI(prompt, settings);
+    const response = await callAIAPI([{ role: 'user', content: prompt }], '', { max_tokens: 200, temperature: 0.3, endpoint: 'memory' });
     
     try {
       const memories = JSON.parse(response);
@@ -119,7 +120,9 @@ ${conversationText}
           }
         }
       }
-    } catch (e) {}
+      } catch (e) {
+        console.warn('解析记忆JSON失败:', e?.message);
+      }
   } catch (e) {
     console.error('提取记忆失败:', e);
   }
@@ -140,7 +143,7 @@ ${conversationText}
 
 只输出总结，不要其他文字。`;
 
-    const summary = await callMemoryAPI(prompt, settings);
+    const summary = await callAIAPI([{ role: 'user', content: prompt }], '', { max_tokens: 200, temperature: 0.3, endpoint: 'memory' });
     
     if (summary) {
       await saveMemory(aiId, MEMORY_TYPES.SUMMARY, summary, 4);
@@ -150,60 +153,43 @@ ${conversationText}
   }
 }
 
-import { trackUsage, extractCachedTokens } from './usage';
+export async function saveMemoryFromExchange(aiId, userMessage, aiResponse, label = '') {
+  const settings = await getAPISettings();
+  if (!settings?.apiKey) return;
 
-async function callMemoryAPI(prompt, settings) {
-  const provider = settings.provider || 'openai';
-  const baseUrl = settings.apiBaseUrl || getDefaultBaseUrl(provider);
-  const model = settings.modelName || getDefaultModel(provider);
+  const summaryPrompt = `分析这段对话，提取关键信息并分类。
 
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 200,
-      temperature: 0.3,
-    }),
-  });
+用户：${userMessage}
+AI：${aiResponse}
 
-  if (!response.ok) return null;
+分类规则：
+- fact：用户个人信息（姓名、年龄、职业等）
+- preference：用户喜好（喜欢什么、讨厌什么）
+- event：发生的具体事件
 
-  const data = await response.json();
-  if (data.usage) {
-    trackUsage({
-      promptTokens: data.usage.prompt_tokens,
-      completionTokens: data.usage.completion_tokens,
-      totalTokens: data.usage.total_tokens,
-      cachedTokens: extractCachedTokens(data.usage),
-      model,
-      provider: settings.provider || 'unknown',
-      endpoint: 'memory',
-    });
+输出JSON格式：
+{"type":"分类","content":"总结内容"}
+
+如果没什么值得记住的，输出：{"type":"none","content":""}
+
+只输出JSON，不要其他文字。`;
+
+  try {
+    const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '', { endpoint: 'memory' });
+    try {
+      const parsed = JSON.parse(result);
+      if (parsed.type && parsed.type !== 'none' && parsed.content) {
+        await executeInsert(
+          'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
+          [aiId, parsed.type, parsed.content, 5]
+        );
+      }
+    } catch (e) {
+      console.warn(`解析${label}记忆JSON失败:`, e?.message);
+    }
+  } catch (e) {
+    console.warn(`保存${label}对话记忆失败:`, e?.message || e);
   }
-  return data.choices?.[0]?.message?.content?.trim() || null;
-}
-
-function getDefaultBaseUrl(provider) {
-  const urls = {
-    openai: 'https://api.openai.com',
-    deepseek: 'https://api.deepseek.com',
-    qwen: 'https://dashscope.aliyuncs.com/compatible-mode',
-  };
-  return urls[provider] || 'https://api.openai.com';
-}
-
-function getDefaultModel(provider) {
-  const models = {
-    openai: 'gpt-3.5-turbo',
-    deepseek: 'deepseek-chat',
-    qwen: 'qwen-turbo',
-  };
-  return models[provider] || 'gpt-3.5-turbo';
 }
 
 export function formatMemoriesForPrompt(memories) {

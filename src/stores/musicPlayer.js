@@ -3,9 +3,6 @@ import { Audio } from 'expo-av';
 import { saveSetting, loadSetting } from '../services/settings';
 import { getSongUrl } from '../services/netease';
 
-let sound = null;
-let isPlayingLock = false;
-
 function getNextIndex(queue, currentIndex, playMode) {
   if (queue.length === 0) return -1;
   if (playMode === 'shuffle') {
@@ -30,6 +27,8 @@ export const useMusicPlayer = create((set, get) => ({
   positionMs: 0,
   durationMs: 0,
   playMode: 'order',
+  _sound: null,
+  _playingLock: false,
 
   persistQueue: async () => {
     const { queue, currentIndex, playMode } = get();
@@ -44,9 +43,10 @@ export const useMusicPlayer = create((set, get) => ({
   },
 
   cleanup: async () => {
-    if (sound) {
-      try { await sound.unloadAsync(); } catch (e) {}
-      sound = null;
+    const { _sound } = get();
+    if (_sound) {
+      try { await _sound.unloadAsync(); } catch (e) { console.warn('卸载音频失败:', e?.message); }
+      set({ _sound: null });
     }
     set({ positionMs: 0, durationMs: 0 });
   },
@@ -67,9 +67,10 @@ export const useMusicPlayer = create((set, get) => ({
           { uri: url },
           { shouldPlay: true, progressUpdateIntervalMillis: 500 }
         );
-        sound = result.sound;
+        const newSound = result.sound;
+        set({ _sound: newSound });
 
-        sound.setOnPlaybackStatusUpdate((status) => {
+        newSound.setOnPlaybackStatusUpdate((status) => {
           if (!status.isLoaded) return;
           set({
             positionMs: status.positionMillis,
@@ -77,10 +78,10 @@ export const useMusicPlayer = create((set, get) => ({
             isPlaying: status.isPlaying,
           });
           if (status.didJustFinish) {
-            const { playMode } = get();
+            const { playMode, _sound } = get();
             if (playMode === 'loop') {
-              sound?.setPositionAsync(0);
-              sound?.playAsync();
+              _sound?.setPositionAsync(0);
+              _sound?.playAsync();
             } else {
               get().next();
             }
@@ -115,46 +116,55 @@ export const useMusicPlayer = create((set, get) => ({
   },
 
   playSong: async (song) => {
-    if (isPlayingLock) return;
-    isPlayingLock = true;
+    const { _playingLock } = get();
+    if (_playingLock) return;
+    set({ _playingLock: true });
     try {
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
       });
-    } catch (e) {}
-
-    const { queue } = get();
-    const existingIndex = queue.findIndex(s => s.id === song.id);
-
-    if (existingIndex >= 0) {
-      if (existingIndex === get().currentIndex && sound) {
-        await sound.playAsync();
-        set({ isPlaying: true });
-      } else {
-        await get().playFromIndex(existingIndex);
-      }
-    } else {
-      const newQueue = [...queue, song];
-      set({ queue: newQueue });
-      await get().playFromIndex(newQueue.length - 1);
+    } catch (e) {
+      console.warn('设置音频模式失败:', e?.message);
     }
-    isPlayingLock = false;
-    await get().persistQueue();
+
+    try {
+      const { queue, _sound } = get();
+      const existingIndex = queue.findIndex(s => s.id === song.id);
+
+      if (existingIndex >= 0) {
+        if (existingIndex === get().currentIndex && _sound) {
+          await _sound.playAsync();
+          set({ isPlaying: true });
+        } else {
+          await get().playFromIndex(existingIndex);
+        }
+      } else {
+        const newQueue = [...queue, song];
+        set({ queue: newQueue });
+        await get().playFromIndex(newQueue.length - 1);
+      }
+
+      await get().persistQueue();
+    } finally {
+      set({ _playingLock: false });
+    }
   },
 
   togglePlay: async () => {
-    const { isPlaying } = get();
-    if (!sound) return;
+    const { isPlaying, _sound } = get();
+    if (!_sound) return;
     try {
       if (isPlaying) {
-        await sound.pauseAsync();
+        await _sound.pauseAsync();
         set({ isPlaying: false });
       } else {
-        await sound.playAsync();
+        await _sound.playAsync();
         set({ isPlaying: true });
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('播放音频失败:', e?.message);
+    }
   },
 
   next: async () => {
@@ -173,8 +183,9 @@ export const useMusicPlayer = create((set, get) => ({
   },
 
   seekTo: async (positionMs) => {
-    if (sound) {
-      try { await sound.setPositionAsync(positionMs); } catch (e) {}
+    const { _sound } = get();
+    if (_sound) {
+      try { await _sound.setPositionAsync(positionMs); } catch (e) { console.warn('设置音频位置失败:', e?.message); }
     }
   },
 

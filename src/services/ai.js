@@ -1,105 +1,16 @@
-import { executeQuery, executeInsert } from '../database';
+import { executeQuery } from '../database';
 import { useAppStore } from '../stores';
-import { getBeijingNow } from '../utils/time';
+import { getCurrentTimeInfo } from '../utils/time';
 import { getEmojiByMood } from './emoji';
 import { getAIMood, analyzeAndUpdateMood, getMoodPrompt, decayMood } from './emotion';
 import { getAPISettings, clearAPISettingsCache, loadSetting } from './settings';
-import { getRelevantMemories, formatMemoriesForPrompt, extractMemories } from './memory';
+import { getRelevantMemories, formatMemoriesForPrompt, extractMemories, saveMemoryFromExchange } from './memory';
 import { generateMomentImage } from './imageGen';
 import { sendLocalNotification } from './notification';
-import { trackUsage, extractCachedTokens } from './usage';
+import { callAIAPI, searchWeb } from './api-client';
 import * as FileSystem from 'expo-file-system';
 
-export { clearAPISettingsCache as clearSettingsCache };
-
-export async function callAIAPI(messages, systemPrompt = '') {
-  const settings = await getAPISettings();
-  
-  if (!settings?.apiKey) {
-    throw new Error('未配置API Key，请在设置中配置');
-  }
-
-  const provider = settings.provider || 'openai';
-  let baseUrl = settings.apiBaseUrl || getDefaultBaseUrl(provider);
-  let model = settings.modelName || getDefaultModel(provider);
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${settings.apiKey}`,
-  };
-
-  if (provider === 'claude') {
-    return await callClaudeAPI(baseUrl, settings.apiKey, model, messages, systemPrompt);
-  }
-
-  const apiMessages = [];
-  if (systemPrompt) {
-    apiMessages.push({ role: 'system', content: systemPrompt });
-  }
-  apiMessages.push(...messages);
-
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model,
-      messages: apiMessages,
-      max_tokens: 500,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API错误 (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json();
-  if (data.usage) {
-    trackUsage({
-      promptTokens: data.usage.prompt_tokens,
-      completionTokens: data.usage.completion_tokens,
-      totalTokens: data.usage.total_tokens,
-      cachedTokens: extractCachedTokens(data.usage),
-      model,
-      provider: settings.provider || 'unknown',
-      endpoint: 'chat',
-    });
-  }
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('API返回数据格式错误');
-  return content;
-}
-
-async function callClaudeAPI(baseUrl, apiKey, model, messages, systemPrompt) {
-  const response = await fetch(`${baseUrl}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 500,
-      system: systemPrompt || '',
-      messages: messages.map(m => ({
-        role: m.role === 'system' ? 'user' : m.role,
-        content: m.content,
-      })),
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Claude API错误 (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json();
-  const text = data.content?.[0]?.text;
-  if (!text) throw new Error('Claude API返回数据格式错误');
-  return text;
-}
+export { clearAPISettingsCache as clearSettingsCache, callAIAPI };
 
 export async function analyzeImage(imageBase64, question = '请描述这张图片') {
   const settings = await getAPISettings();
@@ -132,11 +43,17 @@ export async function analyzeImage(imageBase64, question = '请描述这张图�
     max_tokens: 500,
   };
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
   const response = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
+    signal: controller.signal,
   });
+
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -159,70 +76,6 @@ export async function analyzeImage(imageBase64, question = '请描述这张图�
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('Vision API返回数据格式错误');
   return content;
-}
-
-async function searchWeb(query) {
-  const settings = await getAPISettings();
-  if (!settings?.enableSearch) return null;
-
-  const response = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=3`, {
-    headers: {
-      'Accept': 'application/json',
-      'X-Subscription-Token': settings.searchApiKey || '',
-    },
-  });
-  
-  if (!response.ok) {
-    throw new Error(`搜索API错误 (${response.status})`);
-  }
-  
-  const data = await response.json();
-  return data.web?.results?.map(r => r.description).join('\n') || null;
-}
-
-function getDefaultBaseUrl(provider) {
-  const urls = {
-    openai: 'https://api.openai.com',
-    claude: 'https://api.anthropic.com',
-    deepseek: 'https://api.deepseek.com',
-    qwen: 'https://dashscope.aliyuncs.com/compatible-mode',
-    wenxin: 'https://aip.baidubce.com',
-  };
-  return urls[provider] || '';
-}
-
-function getDefaultModel(provider) {
-  const models = {
-    openai: 'gpt-3.5-turbo',
-    claude: 'claude-3-sonnet-20240229',
-    deepseek: 'deepseek-chat',
-    qwen: 'qwen-turbo',
-    wenxin: 'ernie-bot',
-  };
-  return models[provider] || '';
-}
-
-function getCurrentTimeInfo() {
-  const now = getBeijingNow();
-  const hour = now.hours;
-  const minute = now.minutes;
-  const year = now.year;
-  const month = now.month;
-  const day = now.day;
-  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-  const weekDay = weekDays[now.date.getUTCDay()];
-
-  let period;
-  if (hour >= 5 && hour < 11) period = '早上';
-  else if (hour >= 11 && hour < 14) period = '中午';
-  else if (hour >= 14 && hour < 18) period = '下午';
-  else if (hour >= 18 && hour < 22) period = '晚上';
-  else period = '深夜';
-
-  return {
-    full: `${year}年${month}月${day}日 星期${weekDay} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-    period,
-  };
 }
 
 export function getPersonalityPrompt(character) {
@@ -279,60 +132,55 @@ export async function getAIResponse(aiId, userMessage, recentMessages = []) {
 
   const messages = [{ role: 'user', content: userMessage }];
   
-  let apiResponse = await callAIAPI(messages, systemPrompt);
-  
   const settings = await getAPISettings();
-  if (settings?.enableSearch && !apiResponse) {
-    const searchResult = await searchWeb(userMessage);
-    if (searchResult) {
-      messages.push({ role: 'assistant', content: `搜索结果：${searchResult}` });
-      messages.push({ role: 'user', content: '请根据搜索结果回答我的问题' });
-      apiResponse = await callAIAPI(messages, systemPrompt);
+  
+  let apiResponse;
+  if (settings?.enableSearch) {
+    const searchTool = {
+      type: 'function',
+      function: {
+        name: 'search_web',
+        description: '当用户询问实时信息、最新新闻、你不知道的内容时，搜索网络获取最新信息',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: '搜索关键词' },
+          },
+          required: ['query'],
+        },
+      },
+    };
+
+    const result = await callAIAPI(messages, systemPrompt, { tools: [searchTool] });
+
+    if (result.toolCalls) {
+      for (const call of result.toolCalls) {
+        const args = JSON.parse(call.function.arguments);
+        const searchResult = await searchWeb(args.query);
+        messages.push(result.content ? { role: 'assistant', content: result.content } : null);
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id,
+          content: searchResult || '未找到相关信息',
+        });
+      }
+      apiResponse = await callAIAPI(messages.filter(Boolean), systemPrompt);
+    } else {
+      apiResponse = result;
     }
+  } else {
+    apiResponse = await callAIAPI(messages, systemPrompt);
   }
 
-  const apiSettings = await getAPISettings();
-  if (apiSettings?.apiKey) {
-    try {
-      const summaryPrompt = `分析这段对话，提取关键信息并分类。
-
-用户：${userMessage}
-AI：${apiResponse}
-
-分类规则：
-- fact：用户个人信息（姓名、年龄、职业等）
-- preference：用户喜好（喜欢什么、讨厌什么）
-- event：发生的具体事件
-
-输出JSON格式：
-{"type":"分类","content":"总结内容"}
-
-如果没什么值得记住的，输出：{"type":"none","content":""}
-
-只输出JSON，不要其他文字。`;
-      
-      const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '');
-      
-      try {
-        const parsed = JSON.parse(result);
-        if (parsed.type && parsed.type !== 'none' && parsed.content) {
-          await executeInsert(
-            'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
-            [aiId, parsed.type, parsed.content, 5]
-          );
-        }
-      } catch (e) {}
-    } catch (e) {
-      console.error('保存对话记忆失败:', e);
-    }
+  if (settings?.apiKey) {
+    await saveMemoryFromExchange(aiId, userMessage, apiResponse, '');
   }
 
   if (recentMessages.length > 0 && recentMessages.length % 10 === 0) {
     extractMemories(aiId, recentMessages.slice(-20));
   }
 
-  await analyzeAndUpdateMood(aiId, userMessage, apiResponse, character);
-  const updatedMood = await getAIMood(aiId);
+  const updatedMood = await analyzeAndUpdateMood(aiId, userMessage, apiResponse, character);
   const emoji = await tryGetEmojiForResponse(character, apiResponse, updatedMood);
   
   return { text: apiResponse, emoji, mood: updatedMood.mood };
@@ -386,42 +234,10 @@ export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
 
   const settings = await getAPISettings();
   if (settings?.apiKey && apiResponse && apiResponse.length < 200) {
-    try {
-      const summaryPrompt = `分析这段对话，提取关键信息并分类。
-
-用户：${lastMessage?.content || ''}
-AI：${apiResponse}
-
-分类规则：
-- fact：用户个人信息（姓名、年龄、职业等）
-- preference：用户喜好（喜欢什么、讨厌什么）
-- event：发生的具体事件
-
-输出JSON格式：
-{"type":"分类","content":"总结内容"}
-
-如果没什么值得记住的，输出：{"type":"none","content":""}
-
-只输出JSON，不要其他文字。`;
-      
-      const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '');
-      
-      try {
-        const parsed = JSON.parse(result);
-        if (parsed.type && parsed.type !== 'none' && parsed.content) {
-          await executeInsert(
-            'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
-            [aiId, parsed.type, parsed.content, 5]
-          );
-        }
-      } catch (e) {}
-    } catch (e) {
-      console.warn('保存群聊记忆失败:', e?.message || e);
-    }
+    await saveMemoryFromExchange(aiId, lastMessage?.content || '', apiResponse, '群聊');
   }
 
-  await analyzeAndUpdateMood(aiId, lastMessage?.content || '', apiResponse, character);
-  const updatedMood = await getAIMood(aiId);
+  const updatedMood = await analyzeAndUpdateMood(aiId, lastMessage?.content || '', apiResponse, character);
   const emoji = await tryGetEmojiForResponse(character, apiResponse, updatedMood);
   
   return { text: apiResponse, emoji, mood: updatedMood.mood };
@@ -440,7 +256,9 @@ export function findMentionedAI(message, aiCharacters) {
 async function getEmojiSettings() {
   try {
     return await loadSetting('emoji_settings', { frequency: 30, enabled: true });
-  } catch (e) {}
+  } catch (e) {
+    console.warn('获取表情设置失败:', e?.message);
+  }
   return { frequency: 30, enabled: true };
 }
 

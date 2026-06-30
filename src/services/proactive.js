@@ -1,89 +1,8 @@
 import { executeQuery, executeInsert } from '../database';
 import { useAppStore } from '../stores';
 import { sendLocalNotification } from './notification';
-import { formatTime, getBeijingNow } from '../utils/time';
-import { getAPISettings } from './settings';
-import { trackUsage, extractCachedTokens } from './usage';
-
-async function callAIAPI(messages, systemPrompt = '') {
-  const settings = await getAPISettings();
-  if (!settings?.apiKey) throw new Error('未配置API Key，请在设置中配置');
-
-  const provider = settings.provider || 'openai';
-  const baseUrl = settings.apiBaseUrl || getDefaultBaseUrl(provider);
-  const model = settings.modelName || getDefaultModel(provider);
-
-  const apiMessages = [];
-  if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
-  apiMessages.push(...messages);
-
-  const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${settings.apiKey}`,
-    },
-    body: JSON.stringify({ model, messages: apiMessages, max_tokens: 200, temperature: 0.9 }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API错误 (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json();
-  if (data.usage) {
-    trackUsage({
-      promptTokens: data.usage.prompt_tokens,
-      completionTokens: data.usage.completion_tokens,
-      totalTokens: data.usage.total_tokens,
-      cachedTokens: extractCachedTokens(data.usage),
-      model,
-      provider: settings.provider || 'unknown',
-      endpoint: 'proactive',
-    });
-  }
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('API返回数据格式错误');
-  return content;
-}
-
-function getDefaultBaseUrl(provider) {
-  const urls = { openai: 'https://api.openai.com', deepseek: 'https://api.deepseek.com', qwen: 'https://dashscope.aliyuncs.com/compatible-mode' };
-  return urls[provider] || '';
-}
-
-function getDefaultModel(provider) {
-  const models = { openai: 'gpt-3.5-turbo', deepseek: 'deepseek-chat', qwen: 'qwen-turbo' };
-  return models[provider] || '';
-}
-
-function getCurrentTimeInfo() {
-  const now = getBeijingNow();
-  const hour = now.hours;
-  const minute = now.minutes;
-  const year = now.year;
-  const month = now.month;
-  const day = now.day;
-  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-  const weekDay = weekDays[now.date.getUTCDay()];
-
-  let period;
-  if (hour >= 5 && hour < 11) period = '早上';
-  else if (hour >= 11 && hour < 14) period = '中午';
-  else if (hour >= 14 && hour < 18) period = '下午';
-  else if (hour >= 18 && hour < 22) period = '晚上';
-  else period = '深夜';
-
-  return {
-    full: `${year}年${month}月${day}日 星期${weekDay} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-    period,
-    hour,
-    minute,
-    date: `${month}月${day}日`,
-    weekDay: `星期${weekDay}`,
-  };
-}
+import { formatTime, getCurrentTimeInfo } from '../utils/time';
+import { callAIAPI } from './api-client';
 
 async function getRecentContext(aiId) {
   const recentMessages = await executeQuery(
@@ -126,7 +45,7 @@ ${contextText ? `最近的聊天记录：\n${contextText}\n` : '还没有聊天�
 - 简短，不超过30字
 - 只输出消息内容，不要其他解释`;
 
-  return await callAIAPI([{ role: 'user', content: '主动发一条消息' }], prompt);
+  return await callAIAPI([{ role: 'user', content: '主动发一条消息' }], prompt, { max_tokens: 200, temperature: 0.9, endpoint: 'proactive' });
 }
 
 export async function triggerProactiveReply(conversationId, aiId) {

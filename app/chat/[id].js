@@ -1,4 +1,5 @@
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { styles } from './styles';
 import { useLocalSearchParams, useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { getAIResponse, getGroupAIResponse, findMentionedAI, analyzeImage, aiAutoPostMoment } from '../../src/services/ai';
@@ -7,7 +8,7 @@ import { generateChatImage, isImageGenerationRequest, extractImageDescription } 
 import { detectAndCreateTask, getTaskTypeName } from '../../src/services/taskDetector';
 import { speakText, stopSpeaking, isSpeaking } from '../../src/services/voice';
 import { sendLocalNotification } from '../../src/services/notification';
-import { getEmojiPacks, getPackEmojis } from '../../src/services/emoji';
+import { getEmojiPacks } from '../../src/services/emoji';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { loadSetting } from '../../src/services/settings';
@@ -16,9 +17,12 @@ import * as FileSystem from 'expo-file-system';
 import { copyToAppStorage } from '../../src/services/media';
 import { formatTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
+import { EmojiPanel } from './EmojiPanel';
+import { MusicSearchModal } from './MusicSearchModal';
 import { searchSongs, getSongUrl, extractMusicKeyword } from '../../src/services/netease';
 import { useMusicPlayer } from '../../src/stores/musicPlayer';
 import { detectMapIntent, searchNearby, searchByKeyword, getRoute, getWeather, getAddressFromLocation, getLocationFromAddress, getCurrentLocation, extractCity, extractLocation } from '../../src/services/map';
+import { executeQuery } from '../../src/database';
 
 
 
@@ -38,8 +42,6 @@ export default function ChatScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [emojiPacks, setEmojiPacks] = useState([]);
-  const [selectedPack, setSelectedPack] = useState(null);
-  const [packEmojis, setPackEmojis] = useState([]);
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
   const [userProfile, setUserProfile] = useState({ name: '我', avatar: null });
   const [chatBg, setChatBg] = useState({ id: 'default', color: '#f5f5f5', image: null });
@@ -58,9 +60,6 @@ export default function ChatScreen() {
   const [showNewMessageHint, setShowNewMessageHint] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [showMusicSearch, setShowMusicSearch] = useState(false);
-  const [musicKeyword, setMusicKeyword] = useState('');
-  const [musicResults, setMusicResults] = useState([]);
-  const [isSearchingMusic, setIsSearchingMusic] = useState(false);
   const playSong = useMusicPlayer(s => s.playSong);
   const flatListRef = useRef(null);
   const isAtBottom = useRef(true);
@@ -122,11 +121,6 @@ export default function ChatScreen() {
   const loadEmojiPacks = async () => {
     const packs = await getEmojiPacks();
     setEmojiPacks(packs);
-    if (packs.length > 0 && !selectedPack) {
-      setSelectedPack(packs[0]);
-      const emojis = await getPackEmojis(packs[0].id);
-      setPackEmojis(emojis);
-    }
   };
 
   const loadUserProfile = async () => {
@@ -151,7 +145,6 @@ export default function ChatScreen() {
   };
 
   const loadGroupMembers = async () => {
-    const { executeQuery } = require('../../src/database');
     const members = await executeQuery(
       'SELECT * FROM conversation_members WHERE conversation_id = ?',
       [parseInt(id)]
@@ -199,12 +192,6 @@ export default function ChatScreen() {
       setShowNewMessageHint(true);
     }
   }, [messages.length, isReady]);
-
-  const handleSelectPack = async (pack) => {
-    setSelectedPack(pack);
-    const emojis = await getPackEmojis(pack.id);
-    setPackEmojis(emojis);
-  };
 
   const handleSendImage = async () => {
     try {
@@ -638,29 +625,12 @@ export default function ChatScreen() {
     await playSong(song);
   };
 
-  const handleMusicSearch = async () => {
-    const keyword = musicKeyword.trim();
-    if (!keyword) return;
-    setIsSearchingMusic(true);
-    try {
-      const results = await searchSongs(keyword);
-      setMusicResults(results);
-    } catch (e) {
-      Alert.alert('搜索失败', e.message);
-      setMusicResults([]);
-    }
-    setIsSearchingMusic(false);
-  };
-
-  const handleSendMusicResult = async () => {
-    const results = musicResults;
+  const handleSendMusicResult = async (results) => {
     if (results.length === 0) return;
     const convMembers = await getConversationMembers();
     const aiId = convMembers[0]?.member_id || aiCharacters[0]?.id || 1;
     await sendMessage(parseInt(id), 'ai', aiId, JSON.stringify(results), 'music_list');
     setShowMusicSearch(false);
-    setMusicKeyword('');
-    setMusicResults([]);
   };
 
   const handleEmojiSelect = async (emoji) => {
@@ -682,7 +652,6 @@ export default function ChatScreen() {
   };
 
   const getConversationMembers = async () => {
-    const { executeQuery } = require('../../src/database');
     return await executeQuery(
       'SELECT * FROM conversation_members WHERE conversation_id = ?',
       [parseInt(id)]
@@ -789,82 +758,6 @@ export default function ChatScreen() {
       </View>
     );
   };
-
-  const renderEmojiPanel = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={showEmoji}
-      onRequestClose={() => setShowEmoji(false)}
-    >
-      <View style={styles.emojiPanel}>
-        <View style={styles.emojiHeader}>
-          <Text style={styles.emojiTitle}>表情包</Text>
-          <View style={styles.emojiHeaderActions}>
-            <TouchableOpacity
-              style={styles.emojiSettingsBtn}
-              onPress={() => {
-                setShowEmoji(false);
-                router.push('/emoji-manage');
-              }}
-            >
-              <Ionicons name="settings-outline" size={20} color="#666" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.emojiCloseBtn}
-              onPress={() => setShowEmoji(false)}
-            >
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View style={styles.emojiTabs}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {emojiPacks.map((pack) => (
-              <TouchableOpacity
-                key={pack.id}
-                style={[styles.emojiTab, selectedPack?.id === pack.id && styles.emojiTabActive]}
-                onPress={() => handleSelectPack(pack)}
-              >
-                <Text style={[styles.emojiTabText, selectedPack?.id === pack.id && styles.emojiTabTextActive]}>
-                  {pack.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-        <FlatList
-          data={packEmojis}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.emojiItem}
-              onPress={() => handleEmojiSelect(item)}
-            >
-              <Image source={{ uri: item.image_uri }} style={styles.emojiImage} />
-            </TouchableOpacity>
-          )}
-          keyExtractor={(item, i) => `${item?.id ?? i}-emoji-${i}`}
-          numColumns={5}
-          contentContainerStyle={styles.emojiGrid}
-          ListEmptyComponent={
-            <View style={styles.emptyEmojiContainer}>
-              <Ionicons name="images-outline" size={48} color="#ccc" />
-              <Text style={styles.emptyEmojiText}>暂无表情</Text>
-              <TouchableOpacity
-                style={styles.goManageBtn}
-                onPress={() => {
-                  setShowEmoji(false);
-                  router.push('/emoji-manage');
-                }}
-              >
-                <Text style={styles.goManageBtnText}>去添加</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
-      </View>
-    </Modal>
-  );
 
   const renderGroupMembersModal = () => (
     <Modal
@@ -1002,8 +895,6 @@ export default function ChatScreen() {
               onPress={() => {
                 setShowMoreMenu(false);
                 setShowMusicSearch(true);
-                setMusicKeyword('');
-                setMusicResults([]);
               }}
             >
               <View style={[styles.moreMenuIcon, { backgroundColor: '#9B59B615' }]}>
@@ -1095,7 +986,12 @@ export default function ChatScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {renderEmojiPanel()}
+      <EmojiPanel
+        visible={showEmoji}
+        emojiPacks={emojiPacks}
+        onClose={() => setShowEmoji(false)}
+        onSelectEmoji={handleEmojiSelect}
+      />
       {renderGroupMembersModal()}
 
       <Modal
@@ -1153,73 +1049,12 @@ export default function ChatScreen() {
         </TouchableOpacity>
       </Modal>
 
-      <Modal
+      <MusicSearchModal
         visible={showMusicSearch}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => { setShowMusicSearch(false); setMusicResults([]); }}
-      >
-        <View style={styles.musicSearchOverlay}>
-          <View style={styles.musicSearchContainer}>
-            <View style={styles.musicSearchHeader}>
-              <Text style={styles.musicSearchTitle}>搜音乐</Text>
-              <TouchableOpacity onPress={() => { setShowMusicSearch(false); setMusicResults([]); }}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.musicSearchInputRow}>
-              <TextInput
-                style={styles.musicSearchInput}
-                value={musicKeyword}
-                onChangeText={setMusicKeyword}
-                placeholder="输入歌曲名或歌手"
-                placeholderTextColor="#999"
-                onSubmitEditing={handleMusicSearch}
-                returnKeyType="search"
-              />
-              <TouchableOpacity style={styles.musicSearchBtn} onPress={handleMusicSearch} disabled={isSearchingMusic}>
-                {isSearchingMusic ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="search" size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
-            {musicResults.length > 0 && (
-              <TouchableOpacity style={styles.sendToChatBtn} onPress={handleSendMusicResult}>
-                <Ionicons name="paper-plane" size={16} color="#fff" />
-                <Text style={styles.sendToChatBtnText}>发送到聊天 ({musicResults.length}首)</Text>
-              </TouchableOpacity>
-            )}
-            <FlatList
-              data={musicResults}
-              keyExtractor={(item, i) => `${item?.id ?? i}-music-${i}`}
-              renderItem={({ item, index }) => (
-                <TouchableOpacity style={styles.musicResultItem} onPress={() => handleMusicPlay(item)}>
-                  <Image
-                    source={{ uri: item.cover || 'https://via.placeholder.com/44/4A90D9/fff?text=♫' }}
-                    style={styles.musicResultCover}
-                  />
-                  <View style={styles.musicResultInfo}>
-                    <Text style={styles.musicResultName} numberOfLines={1}>{item.name}</Text>
-                    <Text style={styles.musicResultArtist} numberOfLines={1}>{item.artist}</Text>
-                  </View>
-                  <Ionicons name="play-circle" size={28} color="#4A90D9" />
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                !isSearchingMusic ? (
-                  <View style={styles.musicSearchEmpty}>
-                    <Ionicons name="musical-notes-outline" size={48} color="#ccc" />
-                    <Text style={styles.musicSearchEmptyText}>搜索你想听的歌曲</Text>
-                  </View>
-                ) : null
-              }
-              contentContainerStyle={styles.musicResultList}
-            />
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowMusicSearch(false)}
+        onSendToChat={handleSendMusicResult}
+        onPlaySong={handleMusicPlay}
+      />
 
       <Modal
         visible={!!previewImage}
@@ -1244,682 +1079,3 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  messagesContainer: {
-    flex: 1,
-  },
-  messagesContent: {
-    padding: 12,
-    paddingBottom: 4,
-  },
-  messageContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  userMessage: {
-    justifyContent: 'flex-end',
-  },
-  aiMessage: {
-    justifyContent: 'flex-start',
-  },
-  aiAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4A90D9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  aiAvatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  aiAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#67C23A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  userAvatarText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  userAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginLeft: 8,
-  },
-  messageBubble: {
-    maxWidth: '72%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  userBubble: {
-    backgroundColor: '#4A90D9',
-    borderBottomRightRadius: 6,
-  },
-  aiBubble: {
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 6,
-  },
-  senderName: {
-    fontSize: 12,
-    color: '#4A90D9',
-    marginBottom: 4,
-    fontWeight: '600',
-  },
-  messageText: {
-    fontSize: 16,
-    color: '#333',
-    lineHeight: 22,
-  },
-  userMessageText: {
-    color: '#fff',
-  },
-  emojiMessage: {
-    width: 120,
-    height: 120,
-    borderRadius: 12,
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 4,
-  },
-  messageTime: {
-    fontSize: 11,
-    color: '#999',
-  },
-  userMessageTime: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  voiceButton: {
-    marginLeft: 8,
-    padding: 2,
-  },
-  typingContainer: {
-    padding: 8,
-    paddingHorizontal: 16,
-  },
-  typingText: {
-    fontSize: 13,
-    color: '#999',
-    fontStyle: 'italic',
-  },
-  moreMenu: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    gap: 16,
-  },
-  moreMenuItem: {
-    alignItems: 'center',
-    width: 64,
-  },
-  moreMenuIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  moreMenuText: {
-    fontSize: 11,
-    color: '#666',
-    marginTop: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  attachButton: {
-    padding: 6,
-  },
-  input: {
-    flex: 1,
-    marginHorizontal: 8,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    fontSize: 16,
-    maxHeight: 100,
-  },
-  sendButton: {
-    padding: 8,
-  },
-  sendButtonDisabled: {
-    opacity: 0.5,
-  },
-  emojiPanel: {
-    backgroundColor: '#fff',
-    height: 320,
-  },
-  emojiHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  emojiTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  emojiHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  emojiSettingsBtn: {
-    padding: 4,
-  },
-  emojiCloseBtn: {
-    padding: 4,
-  },
-  emojiTabs: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingHorizontal: 8,
-  },
-  emojiTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  emojiTabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#4A90D9',
-  },
-  emojiTabText: {
-    fontSize: 13,
-    color: '#666',
-  },
-  emojiTabTextActive: {
-    color: '#4A90D9',
-    fontWeight: '500',
-  },
-  addPackBtn: {
-    padding: 8,
-    marginLeft: 'auto',
-  },
-  emojiGrid: {
-    padding: 8,
-  },
-  emojiItem: {
-    flex: 1,
-    aspectRatio: 1,
-    margin: 4,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-  },
-  emojiImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  emojiClose: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  emptyEmojiContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-  },
-  emptyEmojiText: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-  },
-  goManageBtn: {
-    marginTop: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: '#4A90D9',
-    borderRadius: 16,
-  },
-  goManageBtnText: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  quickRepliesPanel: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    padding: 16,
-  },
-  quickRepliesTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 12,
-  },
-  quickRepliesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  quickReplyItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  quickReplyText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  quickReplyClose: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  backgroundImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    opacity: 0.3,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  membersList: {
-    padding: 16,
-  },
-  memberItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  memberAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-  },
-  memberAvatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  memberAvatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  memberInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  memberName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  memberPersonality: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 2,
-  },
-  groupMembersContainer: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  groupMembersHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  groupMembersTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  avatarPreviewOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarPreviewContainer: {
-    alignItems: 'center',
-  },
-  avatarPreviewImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-  },
-  avatarPreviewPlaceholder: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarPreviewText: {
-    color: '#fff',
-    fontSize: 64,
-    fontWeight: 'bold',
-  },
-  avatarPreviewName: {
-    color: '#fff',
-    fontSize: 18,
-    marginTop: 16,
-    fontWeight: '500',
-  },
-  imageOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullImage: {
-    width: '100%',
-    height: '80%',
-  },
-  imageCloseBtn: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-  },
-  loadingMore: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 12,
-    gap: 8,
-  },
-  loadingMoreText: {
-    fontSize: 13,
-    color: '#999',
-  },
-  imagePreviewOverlay: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  imagePreviewContainer: {
-    flex: 1,
-  },
-  imagePreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    paddingTop: 50,
-    backgroundColor: '#fff',
-  },
-  imagePreviewTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  imagePreviewSend: {
-    fontSize: 16,
-    color: '#4A90D9',
-    fontWeight: '600',
-  },
-  imagePreview: {
-    flex: 1,
-    width: '100%',
-  },
-  imageCommentContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-  },
-  imageCommentInput: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    maxHeight: 80,
-  },
-  pendingContainer: {
-    backgroundColor: '#fff',
-    padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  pendingPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  pendingImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-  },
-  pendingClose: {
-    padding: 4,
-  },
-  pendingHint: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 6,
-  },
-  newMessageHint: {
-    position: 'absolute',
-    bottom: 80,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4A90D9',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  newMessageHintText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-
-  musicCardList: {
-    gap: 6,
-  },
-  musicCardScroll: {
-    flexDirection: 'row',
-    marginVertical: 4,
-  },
-  musicCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f8f8',
-    borderRadius: 10,
-    padding: 8,
-    gap: 10,
-  },
-  musicCardCover: {
-    width: 44,
-    height: 44,
-    borderRadius: 6,
-    backgroundColor: '#e0e0e0',
-  },
-  musicCardInfo: {
-    flex: 1,
-  },
-  musicCardName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  musicCardArtist: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 1,
-  },
-  musicCardPlay: {
-    padding: 4,
-  },
-
-  musicSearchOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  musicSearchContainer: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: '80%',
-    paddingBottom: 20,
-  },
-  musicSearchHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  musicSearchTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  musicSearchInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 8,
-  },
-  musicSearchInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 15,
-    color: '#333',
-  },
-  musicSearchBtn: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 8,
-    padding: 10,
-    paddingHorizontal: 14,
-  },
-  sendToChatBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#67C23A',
-    borderRadius: 8,
-    padding: 10,
-    marginHorizontal: 12,
-    marginBottom: 8,
-    gap: 6,
-  },
-  sendToChatBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  musicResultList: {
-    paddingHorizontal: 12,
-  },
-  musicResultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    gap: 10,
-  },
-  musicResultCover: {
-    width: 44,
-    height: 44,
-    borderRadius: 6,
-    backgroundColor: '#e0e0e0',
-  },
-  musicResultInfo: {
-    flex: 1,
-  },
-  musicResultName: {
-    fontSize: 15,
-    color: '#333',
-    fontWeight: '500',
-  },
-  musicResultArtist: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 1,
-  },
-  musicSearchEmpty: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  musicSearchEmptyText: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-  },
-});

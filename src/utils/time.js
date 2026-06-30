@@ -95,3 +95,30 @@ export function getBeijingToday() {
   const now = getBeijingNow();
   return `${now.year}-${padZero(now.month)}-${padZero(now.day)}`;
 }
+
+export function getCurrentTimeInfo() {
+  const now = getBeijingNow();
+  const hour = now.hours;
+  const minute = now.minutes;
+  const year = now.year;
+  const month = now.month;
+  const day = now.day;
+  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+  const weekDay = weekDays[now.date.getUTCDay()];
+
+  let period;
+  if (hour >= 5 && hour < 11) period = '早上';
+  else if (hour >= 11 && hour < 14) period = '中午';
+  else if (hour >= 14 && hour < 18) period = '下午';
+  else if (hour >= 18 && hour < 22) period = '晚上';
+  else period = '深夜';
+
+  return {
+    full: `${year}年${month}月${day}日 星期${weekDay} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
+    period,
+    hour,
+    minute,
+    date: `${month}月${day}日`,
+    weekDay: `星期${weekDay}`,
+  };
+}

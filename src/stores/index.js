@@ -262,13 +262,23 @@ export const useAppStore = create((set, get) => ({
 
   loadMoments: async () => {
     const moments = await executeQuery('SELECT * FROM moments ORDER BY created_at DESC');
-    for (let moment of moments) {
-      moment.comments = await executeQuery(
-        'SELECT * FROM moment_comments WHERE moment_id = ? ORDER BY created_at ASC',
-        [moment.id]
+    if (moments.length > 0) {
+      const ids = moments.map(m => m.id);
+      const placeholders = ids.map(() => '?').join(',');
+      const comments = await executeQuery(
+        `SELECT * FROM moment_comments WHERE moment_id IN (${placeholders}) ORDER BY created_at ASC`,
+        ids
       );
-      moment.likes = JSON.parse(moment.likes || '[]');
-      moment.images = JSON.parse(moment.images || '[]');
+      const commentsByMoment = {};
+      for (const comment of comments) {
+        if (!commentsByMoment[comment.moment_id]) commentsByMoment[comment.moment_id] = [];
+        commentsByMoment[comment.moment_id].push(comment);
+      }
+      for (let moment of moments) {
+        moment.comments = commentsByMoment[moment.id] || [];
+        moment.likes = JSON.parse(moment.likes || '[]');
+        moment.images = JSON.parse(moment.images || '[]');
+      }
     }
     set({ moments });
   },
@@ -278,7 +288,15 @@ export const useAppStore = create((set, get) => ({
       'INSERT INTO moments (author_type, author_id, content, images) VALUES (?, ?, ?, ?)',
       [authorType, authorId, content, JSON.stringify(images)]
     );
-    await get().loadMoments();
+    const [moment] = await executeQuery('SELECT * FROM moments WHERE id = ?', [id]);
+    if (moment) {
+      moment.comments = [];
+      moment.likes = JSON.parse(moment.likes || '[]');
+      moment.images = JSON.parse(moment.images || '[]');
+    }
+    set((state) => ({
+      moments: moment ? [moment, ...state.moments] : state.moments,
+    }));
     return id;
   },
 
@@ -295,17 +313,34 @@ export const useAppStore = create((set, get) => ({
       'INSERT INTO moment_comments (moment_id, author_type, author_id, content, parent_id) VALUES (?, ?, ?, ?, ?)',
       [momentId, authorType, authorId, content, parentId]
     );
-    await get().loadMoments();
+    const [comment] = await executeQuery('SELECT * FROM moment_comments WHERE id = ?', [id]);
+    set((state) => ({
+      moments: state.moments.map((m) =>
+        m.id === momentId ? { ...m, comments: [...m.comments, comment] } : m
+      ),
+    }));
     return id;
   },
 
-  deleteComment: async (commentId) => {
-    const comments = await executeQuery('SELECT id FROM moment_comments WHERE parent_id = ?', [commentId]);
-    for (const comment of comments) {
-      await get().deleteComment(comment.id);
+  deleteComment: async (commentId, momentId = null) => {
+    if (momentId === null) {
+      const [parent] = await executeQuery('SELECT moment_id FROM moment_comments WHERE id = ?', [commentId]);
+      momentId = parent?.moment_id;
+    }
+    const childComments = await executeQuery('SELECT id FROM moment_comments WHERE parent_id = ?', [commentId]);
+    for (const child of childComments) {
+      await get().deleteComment(child.id, momentId);
     }
     await executeUpdate('DELETE FROM moment_comments WHERE id = ?', [commentId]);
-    await get().loadMoments();
+    if (momentId) {
+      set((state) => ({
+        moments: state.moments.map((m) =>
+          m.id === momentId
+            ? { ...m, comments: m.comments.filter((c) => c.id !== commentId) }
+            : m
+        ),
+      }));
+    }
   },
 
   likeMoment: async (momentId, userId) => {
@@ -318,7 +353,11 @@ export const useAppStore = create((set, get) => ({
         likes.push(userId);
       }
       await executeUpdate('UPDATE moments SET likes = ? WHERE id = ?', [JSON.stringify(likes), momentId]);
-      await get().loadMoments();
+      set((state) => ({
+        moments: state.moments.map((m) =>
+          m.id === momentId ? { ...m, likes } : m
+        ),
+      }));
     }
   },
 

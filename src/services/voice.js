@@ -1,4 +1,6 @@
 import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import { saveSetting, loadSetting } from './settings';
 
 const TTS_PROVIDERS = {
@@ -44,7 +46,9 @@ async function getVoiceSettings() {
       voiceId: '默认',
       autoPlay: true,
     });
-  } catch (e) {}
+  } catch (e) {
+    console.warn('获取语音设置失败:', e?.message);
+  }
   return {
     provider: 'system',
     voiceId: '默认',
@@ -110,7 +114,18 @@ async function speakWithMiMo(text, voiceId) {
       return;
     }
 
-    await speakWithSystem(text, '默认');
+    const audioData = await response.arrayBuffer();
+    const filePath = `${FileSystem.cacheDirectory}mimo_${Date.now()}.mp3`;
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(audioData)));
+    await FileSystem.writeAsStringAsync(filePath, base64, { encoding: FileSystem.EncodingType.Base64 });
+
+    const { sound } = await Audio.Sound.createAsync({ uri: filePath });
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        sound.unloadAsync();
+      }
+    });
+    await sound.playAsync();
   } catch (error) {
     console.warn('MiMo TTS错误，回退到系统语音:', error);
     await speakWithSystem(text, '默认');

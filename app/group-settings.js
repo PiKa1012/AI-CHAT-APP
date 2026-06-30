@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { copyToAppStorage } from '../src/services/media';
+import { executeQuery } from '../src/database';
 
 export default function GroupSettingsScreen() {
   const router = useRouter();
@@ -29,7 +30,6 @@ export default function GroupSettingsScreen() {
   }, [conversation]);
 
   const loadMembers = async () => {
-    const { executeQuery } = require('../src/database');
     const memberList = await executeQuery(
       'SELECT * FROM conversation_members WHERE conversation_id = ?',
       [parseInt(id)]
