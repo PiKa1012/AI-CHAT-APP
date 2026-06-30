@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
-const GITHUB_REPO = 'PiKa1012/AI-CHAT-APP';
+const GITHUB_REPO = 'PiKa1012/AI-CHAT-APP'; // 改仓库名时记得同步更新这里
 const APP_VERSION = Constants.expoConfig?.version || '1.0.0';
 
 export default function AboutScreen() {
