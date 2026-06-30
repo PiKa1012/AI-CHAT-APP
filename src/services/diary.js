@@ -1,6 +1,6 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { getBeijingNow, getBeijingToday } from '../utils/time';
-import { getAPISettings } from './settings';
+import { getAPISettings, loadSetting } from './settings';
 import { generateDiaryImage } from './imageGen';
 import { trackUsage, extractCachedTokens } from './usage';
 
@@ -21,11 +21,15 @@ async function callAIAPI(messages, systemPrompt = '') {
   if (systemPrompt) apiMessages.push({ role: 'system', content: systemPrompt });
   apiMessages.push(...messages);
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
   const response = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ model, messages: apiMessages, max_tokens: 1000, temperature: 0.8 }),
+    body: JSON.stringify({ model, messages: apiMessages, max_tokens: 4096, temperature: 0.8 }),
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -88,7 +92,7 @@ export async function getTodayContext(aiId) {
   );
 
   const moments = await executeQuery(
-    'SELECT content FROM moments WHERE created_at >= ? ORDER BY created_at DESC LIMIT 5',
+    "SELECT content FROM moments WHERE created_at >= ? AND author_type = 'user' ORDER BY created_at DESC LIMIT 5",
     [timeInfo.date]
   );
 
@@ -112,18 +116,14 @@ export async function generateDiary(aiId, style = 'normal') {
   const context = await getTodayContext(aiId);
   const timeInfo = getCurrentTimeInfo();
 
-  const stylePrompts = {
-    normal: '写一篇日记，记录今天发生的事情和感受。',
-    poetic: '用诗意的语言写一篇日记，可以加入一些比喻和感悟。',
-    funny: '用轻松幽默的语气写一篇日记，可以加一些搞笑的描述。',
-    simple: '用简洁的方式记录今天的重点事件。',
-  };
+  const userProfile = await loadSetting('user_profile', {});
+  const userName = userProfile.name || '你';
 
   let contextText = '';
   if (context.messages.length > 0) {
     contextText += '今天的聊天记录：\n';
     context.messages.forEach(m => {
-      contextText += `${m.sender_type === 'user' ? '用户' : character.name}：${m.content}\n`;
+      contextText += `${m.sender_type === 'user' ? userName : character.name}：${m.content}\n`;
     });
   }
   if (context.moments.length > 0) {
@@ -137,14 +137,27 @@ export async function generateDiary(aiId, style = 'normal') {
     contextText = '今天还没有任何互动记录。';
   }
 
+  const lastDiary = await executeQuery(
+    "SELECT title, content FROM diaries WHERE ai_id = ? AND created_at < ? ORDER BY created_at DESC LIMIT 1",
+    [aiId, timeInfo.date]
+  );
+
+  let avoidRepeat = '';
+  if (lastDiary.length > 0) {
+    avoidRepeat = `\n你上次写的日记标题是"${lastDiary[0].title}"，这次请写完全不同的内容。\n`;
+  }
+
   const prompt = `你是${character.name}，性格${character.personality || '友好'}。${character.description || ''}
 
 今天是${timeInfo.full}，现在是${timeInfo.hour}点。
-${stylePrompts[style] || stylePrompts.normal}
 
-${contextText}
+作为${character.name}，写下你最近对${userName}的观察和感受。
+回忆今天的聊天内容、你注意到的${userName}的小事、你的心情变化。
+用第一人称"我"来写，不要出现自己的名字，用"${userName}"称呼${userName}。
 
-请根据以上内容写一篇日记。输出格式：
+今天的情况：
+${contextText}${avoidRepeat}
+输出格式：
 标题：xxx
 内容：xxx
 心情：xxx（一个词）
@@ -155,7 +168,7 @@ ${contextText}
   const result = await callAIAPI([{ role: 'user', content: '请写今天的日记' }], prompt);
   
   const titleMatch = result.match(/标题[：:]\s*(.+)/);
-  const contentMatch = result.match(/内容[：:]\s*([\s\S]+?)(?=心情|$)/);
+  const contentMatch = result.match(/内容[：:]\s*([\s\S]+?)(?=\n心情[：:]|\n天气[：:]|$)/);
   const moodMatch = result.match(/心情[：:]\s*(.+)/);
   const weatherMatch = result.match(/天气[：:]\s*(.+)/);
 
@@ -189,7 +202,9 @@ ${contextText}
   return { id: diaryId, title, content, mood, weather, images };
 }
 
-export async function getDiaries(aiId = null, limit = 20) {
+const PAGE_SIZE = 10;
+
+export async function getDiaries(aiId = null, offset = 0) {
   let sql = `
     SELECT d.*, a.name as ai_name, a.avatar as ai_avatar
     FROM diaries d
@@ -202,10 +217,13 @@ export async function getDiaries(aiId = null, limit = 20) {
     params.push(aiId);
   }
 
-  sql += ' ORDER BY d.created_at DESC LIMIT ?';
-  params.push(limit);
+  sql += ' ORDER BY d.created_at DESC LIMIT ? OFFSET ?';
+  params.push(PAGE_SIZE + 1, offset);
 
   const diaries = await executeQuery(sql, params);
+
+  const hasMore = diaries.length > PAGE_SIZE;
+  if (hasMore) diaries.pop();
 
   for (let diary of diaries) {
     diary.comments = await executeQuery(
@@ -216,7 +234,7 @@ export async function getDiaries(aiId = null, limit = 20) {
     diary.images = JSON.parse(diary.images || '[]');
   }
 
-  return diaries;
+  return { diaries, hasMore };
 }
 
 export async function getDiaryById(diaryId) {
@@ -273,6 +291,40 @@ export async function commentOnDiary(diaryId, authorType, authorId, content) {
   );
 }
 
+export async function aiReplyToDiaryComment(diaryId, userComment) {
+  try {
+    const diary = await getDiaryById(diaryId);
+    if (!diary) return;
+
+    const ai = await executeQuery('SELECT * FROM ai_characters WHERE id = ?', [diary.ai_id]);
+    if (ai.length === 0) return;
+
+    const character = ai[0];
+    const userProfile = await loadSetting('user_profile', {});
+    const userName = userProfile.name || '你';
+
+    const prompt = `你是${character.name}，性格${character.personality || '友好'}。${character.description || ''}
+
+你写了一篇日记：
+标题：${diary.title}
+内容：${diary.content.substring(0, 300)}
+
+现在${userName}在你的日记下回应了："${userComment}"
+请用第一人称回复${userName}的这条回应，语气自然真诚，像朋友聊天一样。
+只输出回复内容，不要加引号。`;
+
+    const reply = await callAIAPI([{ role: 'user', content: '回复用户' }], prompt);
+    if (reply) {
+      await executeInsert(
+        'INSERT INTO diary_comments (diary_id, author_type, author_id, content) VALUES (?, ?, ?, ?)',
+        [diaryId, 'ai', diary.ai_id, reply.trim()]
+      );
+    }
+  } catch (e) {
+    console.error('AI回复日记评论失败:', e);
+  }
+}
+
 export async function getDiaryStats(aiId) {
   const total = await executeQuery('SELECT COUNT(*) as count FROM diaries WHERE ai_id = ?', [aiId]);
   const thisMonth = await executeQuery(
@@ -283,10 +335,20 @@ export async function getDiaryStats(aiId) {
     'SELECT mood, COUNT(*) as count FROM diaries WHERE ai_id = ? GROUP BY mood ORDER BY count DESC LIMIT 5',
     [aiId]
   );
+  const ai = await executeQuery('SELECT created_at FROM ai_characters WHERE id = ?', [aiId]);
+
+  let daysKnown = 0;
+  if (ai[0]?.created_at) {
+    const created = new Date(ai[0].created_at);
+    const today = new Date(getBeijingToday());
+    const diffMs = today.getTime() - created.getTime();
+    daysKnown = Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1);
+  }
 
   return {
     total: total[0]?.count || 0,
     thisMonth: thisMonth[0]?.count || 0,
     topMoods: moods || [],
+    daysKnown,
   };
 }

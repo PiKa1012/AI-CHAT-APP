@@ -68,31 +68,26 @@ export default function MomentDetailScreen() {
   const handleComment = async (text, parentId = null) => {
     if (!text?.trim() || !moment) return;
     const userCommentText = text.trim();
-    const newCommentId = await commentOnMoment(moment.id, 'user', 1, userCommentText, parentId);
+    await commentOnMoment(moment.id, 'user', 1, userCommentText, parentId);
     setReplyToComment(null);
     setCommentText('');
-    setTimeout(async () => {
-      try {
-        const updatedMoments = useAppStore.getState().moments;
-        const updatedMoment = updatedMoments.find(m => m.id === moment.id);
-        let replyAIId = null;
-        let replyToCommentId = newCommentId;
-        if (parentId) {
-          const parentComment = updatedMoment?.comments?.find(c => c.id === parentId);
-          if (parentComment && parentComment.author_type === 'ai') { replyAIId = parentComment.author_id; replyToCommentId = parentId; }
-        }
-        if (!replyAIId && updatedMoment?.author_type === 'ai') replyAIId = updatedMoment.author_id;
-        if (!replyAIId && aiCharacters.length > 0) replyAIId = aiCharacters[0].id;
-        if (replyAIId) {
-          const aiReply = await aiCommentOnMoment(moment.id, replyToCommentId, userCommentText, replyAIId);
-          await loadMoments();
-          const replyAI = aiCharacters.find(a => a.id === replyAIId);
-          if (replyAI) {
-            await sendLocalNotification('收到回复', `${replyAI.name} 回复了你: ${aiReply?.text?.slice(0, 50) || ''}`, { type: 'reply', momentId: moment.id });
-          }
-        }
-      } catch (e) { console.error('AI回复评论失败:', e); }
-    }, 2000);
+    await loadMoments();
+    try {
+      const updatedMoments = useAppStore.getState().moments;
+      const updatedMoment = updatedMoments.find(m => m.id === moment.id);
+      let replyAIId = null;
+      let replyToCommentId = null;
+      if (parentId) {
+        const parentComment = updatedMoment?.comments?.find(c => c.id === parentId);
+        if (parentComment && parentComment.author_type === 'ai') { replyAIId = parentComment.author_id; replyToCommentId = parentId; }
+      }
+      if (!replyAIId && updatedMoment?.author_type === 'ai') replyAIId = updatedMoment.author_id;
+      if (!replyAIId && aiCharacters.length > 0) replyAIId = aiCharacters[0].id;
+      if (replyAIId) {
+        await aiCommentOnMoment(moment.id, replyToCommentId, userCommentText, replyAIId);
+        await loadMoments();
+      }
+    } catch (e) { console.error('AI回复评论失败:', e); }
   };
 
   const handleDeleteComment = (commentId) => {
