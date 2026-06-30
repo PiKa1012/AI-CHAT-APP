@@ -124,8 +124,8 @@ ${name}：${aiResponse}
   try {
     const content = await callAIAPI(
       [{ role: 'user', content: prompt }],
-      '',
-      { max_tokens: 200, temperature: 0.3, endpoint: 'emotion' }
+      '你是一个情绪分析助手，严格按用户要求的JSON格式输出，不要输出其他内容。',
+      { max_tokens: 300, temperature: 0.3, endpoint: 'emotion' }
     );
 
     const jsonMatch = content.match(/\{[\s\S]*\}/);

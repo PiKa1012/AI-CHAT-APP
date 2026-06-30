@@ -39,6 +39,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web"
   },
+  "author": "PiKa1012",
   "private": true,
   "devDependencies": {
     "eslint": "^8.57.0",

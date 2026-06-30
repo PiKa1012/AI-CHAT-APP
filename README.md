@@ -2,6 +2,9 @@
 
 一个 AI 陪伴社交应用，基于 Expo SDK 52 + React Native + Expo Router 构建。
 
+**作者：** [PiKa1012](https://github.com/PiKa1012)  
+**版本：** v1.0.0 — 查看 [Releases](https://github.com/PiKa1012/AI-CHAT-APP/releases) 获取最新版本
+
 ## 功能
 
 ### AI 聊天
@@ -162,17 +165,15 @@ node index.js
 ```
 ├── app/                               # Expo Router 页面（文件即路由）
 │   ├── _layout.js                     # 根布局 → 初始化 DB/通知/调度 + 全局音乐播放器
+│   ├── about.js                       # 关于页面（版本信息 + 检查更新）
 │   ├── (tabs)/                        # 底部 Tab 导航
 │   │   ├── _layout.js                 # Tab 配置（4 个标签）
 │   │   ├── index.js                   # 首页 — 会话列表
 │   │   ├── diary.js                   # 日记 feed
 │   │   ├── moments.js                 # 朋友圈 feed
 │   │   └── settings.js                # 设置中心
-│   ├── chat/                          # 聊天相关（[id].js 是路由，其余是组件）
-│   │   ├── [id].js                    # 聊天页面（~1080 行）
-│   │   ├── EmojiPanel.js              # 表情选择面板
-│   │   ├── MusicSearchModal.js        # 音乐搜索弹窗
-│   │   └── styles.js                  # 聊天样式（~680 行 StyleSheet）
+│   ├── chat/                          # 聊天（[id].js 是路由页面）
+│   │   └── [id].js                    # 聊天页面（~1080 行）
 │   ├── ai-manage.js                   # AI 角色 CRUD
 │   ├── ai-mood.js                     # AI 心情查看/编辑
 │   ├── ai-profile.js                  # AI 个人主页（封面/头像/性格）
@@ -204,7 +205,7 @@ node index.js
 │   │   └── musicPlayer.js             # 音乐播放器 Store
 │   ├── services/
 │   │   ├── ai.js                      # AI 编排（人格+心情+记忆+API 调用）
-│   │   ├── api-client.js              # AI API 客户端（3 厂商 HTTP + 重试）
+│   │   ├── api-client.js              # AI API 客户端（3 厂商 + 工具调用 + 联网搜索）
 │   │   ├── diary.js                   # 日记服务（AI 写日记+评论）
 │   │   ├── emoji.js                   # 表情包服务
 │   │   ├── emotion.js                 # 心情系统（11 种情绪）
@@ -222,7 +223,11 @@ node index.js
 │   │   └── voice.js                   # TTS 语音（4 引擎）
 │   ├── components/
 │   │   ├── MusicPlayer.js             # 悬浮迷你播放器（可拖拽）
-│   │   └── SafeImage.js               # 安全图片组件（失败占位符）
+│   │   ├── SafeImage.js               # 安全图片组件（失败占位符）
+│   │   └── chat/
+│   │       ├── EmojiPanel.js          # 表情选择面板
+│   │       ├── MusicSearchModal.js    # 音乐搜索弹窗
+│   │       └── styles.js              # 聊天样式（~680 行 StyleSheet）
 │   ├── data/
 │   │   └── emojis.js                  # 默认表情包数据
 │   └── utils/
@@ -307,3 +312,89 @@ npx expo start
 4. **使用：** 聊天界面点 **⊕ → 🎵** 搜歌，点歌可试听或发送音乐卡片
 
 > Vercel 免费版函数超时 10s，部分慢接口可能失败，生产用建议升级付费版。
+
+## 版本管理
+
+版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/) 规范：`主版本.次版本.补丁`
+
+- **主版本**：不兼容的大改动（如 1→2）
+- **次版本**：向下兼容的新功能（如 1.0→1.1）
+- **补丁**：向下兼容的 bug 修复（如 1.0.0→1.0.1）
+
+### 发布新版本（APK）
+
+版本号统一维护在 `app.json` 中，每次发布前先修改这两个地方：
+- `"version"` → 改成新版本号，例如 `"1.0.1"`
+- `"versionCode"` → 加 1（必须比上一次大，Android 系统用这个判断哪个版本更新）
+
+#### 在 GitHub 上发布 Release 的完整步骤
+
+**第 1 步：打开仓库**
+
+浏览器打开 https://github.com/PiKa1012/AI-CHAT-APP
+
+**第 2 步：找到 Releases 入口**
+
+- 页面右侧中间有个 **Releases** 的标题，点进去
+- 或者点页面顶部导航栏的 **Code** 标签，然后看右边侧栏也能找到 **Releases**
+
+**第 3 步：创建新 Release**
+
+- 如果是第一次发布，页面中间会有一个绿色的大按钮 **Create a new release**
+- 如果之前发布过，会看到版本列表，点左上角的 **Draft a new release** 按钮（也是绿色）
+
+**第 4 步：填写 Tag 版本号**
+
+- 在 **Tag** 输入框里打 `v1.0.1`
+- 打完后下面会弹出一行灰色小字 "Create new tag: v1.0.1 on publish"，不用管它，这是正常提示
+- **Tag 必须带 `v` 前缀**，因为 App 里的检查更新逻辑是按 `v` 开头的 tag 来解析的
+
+**第 5 步：填写 Release 标题**
+
+- **Release title** 同样填 `v1.0.1`，保持一致就行
+
+**第 6 步：写更新日志**
+
+- 在 **Describe this release** 这个大文本框里写这次改了什么
+- 格式自由，推荐这样写：
+
+```
+### v1.0.1 更新内容
+
+🐛 修复
+- 修复了聊天输入框卡顿的问题
+- 修复了某些机型上闪退的问题
+
+✨ 新增
+- 新增了检查更新功能
+- 新增了某某功能
+
+🛠 优化
+- 优化了加载速度
+```
+
+**第 7 步：上传 APK 文件**
+
+- 往下翻，看到一个虚线框，上面写着 **Attach binaries by dropping them here or selecting them**
+- 把 `.apk` 文件从电脑文件夹拖进去，或者点这个区域选择文件
+- 上传成功后文件会出现在下面，显示文件名和大小
+
+**第 8 步：检查设置并发布**
+
+- 确认 **Set as the latest release** 前面的复选框是打勾状态（默认就是勾着的）
+- 如果你想标记为预发布（Pre-release），可以勾选 **Set as a pre-release**，但正常发布不需要
+- 确认无误后，点绿色的 **Publish release** 按钮
+
+**第 9 步：验证**
+
+- 发布成功后会自动跳转到 Releases 页面
+- 你应该能看到刚发布的版本 `v1.0.1`，点进去可以看到上传的 `.apk` 文件
+- 打开 App → 设置 → 关于 → 点 **检查更新**，应该会弹出新版本提示
+
+#### ⚠️ 注意事项
+
+- **Tag 名必须带 `v` 前缀**（如 `v1.0.1`），App 解析版本号时会自动去掉 `v`，如果写成 `1.0.1` 会匹配不到
+- **`versionCode` 每次必须递增**，哪怕只加了 1 也行，但不能重复或减小，否则 Android 系统会拒绝安装旧版本
+- **`version` 和 `versionCode` 是两码事**：`version` 是给人看的（1.0.1），`versionCode` 是给系统判断的（1, 2, 3...）
+- **发布后发现有 bug 想撤回**：在 Releases 页面点对应版本号右边的 **✏️ Edit** 按钮，拉到最下面点红色的 **Delete release**，同时也会让你删掉对应的 tag
+- **App 检查更新原理**：调 GitHub API 获取最新 Release → 找到附件里后缀为 `.apk` 的文件 → 给用户下载链接，不需要任何服务器

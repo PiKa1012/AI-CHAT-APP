@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { formatTime, formatDate } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 import { executeQuery, executeUpdate } from '../../src/database';
@@ -27,6 +27,10 @@ export default function HomeScreen() {
     loadAICharacters();
     checkUnreadMessages();
   }, []));
+
+  useEffect(() => {
+    checkUnreadMessages();
+  }, [conversations]);
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -154,17 +154,17 @@ export async function getAIResponse(aiId, userMessage, recentMessages = []) {
     const result = await callAIAPI(messages, systemPrompt, { tools: [searchTool] });
 
     if (result.toolCalls) {
+      messages.push({ role: 'assistant', content: result.content || null, tool_calls: result.toolCalls });
       for (const call of result.toolCalls) {
         const args = JSON.parse(call.function.arguments);
         const searchResult = await searchWeb(args.query);
-        messages.push(result.content ? { role: 'assistant', content: result.content } : null);
         messages.push({
           role: 'tool',
           tool_call_id: call.id,
           content: searchResult || '未找到相关信息',
         });
       }
-      apiResponse = await callAIAPI(messages.filter(Boolean), systemPrompt);
+      apiResponse = await callAIAPI(messages, systemPrompt);
     } else {
       apiResponse = result;
     }

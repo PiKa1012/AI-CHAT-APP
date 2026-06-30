@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { searchSongs } from '../../src/services/netease';
+import { searchSongs } from '../../services/netease';
 import { styles } from './styles';
 
 export const MusicSearchModal = ({ visible, onClose, onSendToChat, onPlaySong }) => {

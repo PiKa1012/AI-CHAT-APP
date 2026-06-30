@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, FlatList, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { getPackEmojis } from '../../src/services/emoji';
+import { getPackEmojis } from '../../services/emoji';
 import { styles } from './styles';
 
 export const EmojiPanel = ({ visible, emojiPacks, onClose, onSelectEmoji }) => {
