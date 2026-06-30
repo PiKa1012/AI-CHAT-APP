@@ -175,7 +175,7 @@ AI：${aiResponse}
 只输出JSON，不要其他文字。`;
 
   try {
-    const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '', { endpoint: 'memory' });
+    const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '你是一个信息提取助手，按用户要求的JSON格式输出。', { max_tokens: 300, endpoint: 'memory' });
     try {
       const parsed = JSON.parse(result);
       if (parsed.type && parsed.type !== 'none' && parsed.content) {

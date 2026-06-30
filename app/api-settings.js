@@ -102,6 +102,7 @@ export default function APISettingsScreen() {
   const [isTestingVision, setIsTestingVision] = useState(false);
   const [isTestingTTS, setIsTestingTTS] = useState(false);
   const [isTestingImageGen, setIsTestingImageGen] = useState(false);
+  const [isTestingSearch, setIsTestingSearch] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -334,6 +335,30 @@ export default function APISettingsScreen() {
     setIsTestingTTS(false);
   };
 
+  const testSearchConnection = async () => {
+    if (!searchApiKey?.trim()) {
+      Alert.alert('提示', '请先输入搜索API Key');
+      return;
+    }
+    setIsTestingSearch(true);
+    try {
+      const response = await fetch('https://api.bochaai.com/v1/web-search', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${searchApiKey.trim()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '测试', count: 1, summary: true }),
+      });
+      if (response.ok) {
+        Alert.alert('成功', '搜索API连接正常！');
+      } else {
+        const text = await response.text();
+        Alert.alert('失败', `搜索API错误 (${response.status}): ${text}`);
+      }
+    } catch (e) {
+      Alert.alert('失败', `网络错误: ${e.message}`);
+    }
+    setIsTestingSearch(false);
+  };
+
   const testImageGenConnection = async () => {
     const apiKey = imageGenApiKey || apiKey;
     if (!apiKey) {
@@ -468,13 +493,18 @@ export default function APISettingsScreen() {
         {enableSearch && (
           <View style={styles.subSection}>
             <Text style={styles.label}>搜索API Key</Text>
-            <TextInput
-              style={styles.input}
-              value={searchApiKey}
-              onChangeText={setSearchApiKey}
-              placeholder="输入博查搜索API Key"
-              placeholderTextColor="#999"
-            />
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={searchApiKey}
+                onChangeText={setSearchApiKey}
+                placeholder="输入博查搜索API Key"
+                placeholderTextColor="#999"
+              />
+              <TouchableOpacity style={styles.testSmallButton} onPress={testSearchConnection} disabled={isTestingSearch}>
+                <Text style={styles.testSmallButtonText}>{isTestingSearch ? '测试中...' : '测试连接'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -814,6 +844,10 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 15,
     color: '#333',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   testButton: {
     backgroundColor: '#4A90D9',

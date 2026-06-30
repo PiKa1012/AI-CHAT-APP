@@ -202,9 +202,9 @@ export default function SettingsScreen() {
         <SettingItem
           icon="information-circle"
           title="关于"
-          subtitle="版本 1.0.0"
+          subtitle="查看版本信息和检查更新"
           color="#909399"
-          onPress={() => Alert.alert('AI陪伴', '版本 1.0.0\n一个AI社交陪伴应用')}
+          onPress={() => router.push('/about')}
         />
       </View>
     </ScrollView>

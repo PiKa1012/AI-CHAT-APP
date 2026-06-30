@@ -94,7 +94,12 @@ export async function callAIAPI(messages, systemPrompt = '', options = {}) {
   }
 
   const content = choice?.message?.content;
-  if (!content) throw new Error('API返回数据格式错误');
+  if (!content) {
+    if (choice?.finish_reason === 'tool_calls') {
+      return '';
+    }
+    throw new Error('API返回数据格式错误');
+  }
   return content;
 }
 
@@ -110,8 +115,9 @@ export async function searchWeb(query) {
     },
     body: JSON.stringify({
       query,
-      count: 3,
+      count: 8,
       summary: true,
+
     }),
   });
 
@@ -120,5 +126,9 @@ export async function searchWeb(query) {
   }
 
   const data = await response.json();
-  return data.data?.webPages?.value?.map(r => r.snippet || r.summary).join('\n') || null;
+  const results = data.data?.webPages?.value;
+  if (!results || results.length === 0) return null;
+  return results.map((r, i) =>
+    `[${i + 1}] ${r.name}\n${r.summary || r.snippet}\n来源: ${r.url}`
+  ).join('\n\n');
 }

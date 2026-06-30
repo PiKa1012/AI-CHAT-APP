@@ -1,5 +1,5 @@
 import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
-import { styles } from './styles';
+import { styles } from '../../src/components/chat/styles';
 import { useLocalSearchParams, useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { getAIResponse, getGroupAIResponse, findMentionedAI, analyzeImage, aiAutoPostMoment } from '../../src/services/ai';
@@ -17,8 +17,8 @@ import * as FileSystem from 'expo-file-system';
 import { copyToAppStorage } from '../../src/services/media';
 import { formatTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
-import { EmojiPanel } from './EmojiPanel';
-import { MusicSearchModal } from './MusicSearchModal';
+import { EmojiPanel } from '../../src/components/chat/EmojiPanel';
+import { MusicSearchModal } from '../../src/components/chat/MusicSearchModal';
 import { searchSongs, getSongUrl, extractMusicKeyword } from '../../src/services/netease';
 import { useMusicPlayer } from '../../src/stores/musicPlayer';
 import { detectMapIntent, searchNearby, searchByKeyword, getRoute, getWeather, getAddressFromLocation, getLocationFromAddress, getCurrentLocation, extractCity, extractLocation } from '../../src/services/map';
