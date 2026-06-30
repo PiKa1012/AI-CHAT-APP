@@ -12,9 +12,16 @@ export default function AboutScreen() {
   const checkForUpdates = async () => {
     try {
       const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
-        headers: { 'Accept': 'application/vnd.github.v3+json' },
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'AI-CHAT-APP',
+        },
       });
-      if (!response.ok) throw new Error('请求失败');
+      if (!response.ok) {
+        if (response.status === 404) throw new Error('仓库或发行版不存在');
+        if (response.status === 403) throw new Error('GitHub API 请求超限，请稍后重试');
+        throw new Error(`请求失败 (HTTP ${response.status})`);
+      }
       const data = await response.json();
       const latestVersion = data.tag_name.replace(/^v/, '');
       const currentVersion = APP_VERSION;
@@ -35,7 +42,14 @@ export default function AboutScreen() {
         Alert.alert('已是最新版', `当前已是最新版本 v${currentVersion}`);
       }
     } catch (error) {
-      Alert.alert('检查失败', '无法连接到 GitHub，请检查网络后重试');
+      Alert.alert(
+        '检查失败',
+        error.message || '无法连接到 GitHub，请检查网络后重试',
+        [
+          { text: '知道了', style: 'cancel' },
+          { text: '去 Releases 页', onPress: () => Linking.openURL(`https://github.com/${GITHUB_REPO}/releases`) },
+        ]
+      );
     }
   };
 
