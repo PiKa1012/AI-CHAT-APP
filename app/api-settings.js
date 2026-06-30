@@ -6,10 +6,8 @@ import { saveSetting, loadSetting, clearAPISettingsCache } from '../src/services
 
 const AI_PROVIDERS = [
   { id: 'openai', name: 'OpenAI', icon: '🤖', placeholder: 'sk-...' },
-  { id: 'claude', name: 'Claude', icon: '🧠', placeholder: 'sk-ant-...' },
   { id: 'deepseek', name: 'DeepSeek', icon: '🔮', placeholder: 'sk-...' },
   { id: 'qwen', name: '通义千问', icon: '☁️', placeholder: 'sk-...' },
-  { id: 'wenxin', name: '文心一言', icon: '📝', placeholder: 'api key' },
   { id: 'custom', name: '自定义', icon: '⚙️', placeholder: '输入API地址' },
 ];
 
@@ -375,10 +373,8 @@ export default function APISettingsScreen() {
   const getDefaultBaseUrl = (provider) => {
     const urls = {
       openai: 'https://api.openai.com',
-      claude: 'https://api.anthropic.com',
       deepseek: 'https://api.deepseek.com',
       qwen: 'https://dashscope.aliyuncs.com/compatible-mode',
-      wenxin: 'https://aip.baidubce.com',
       custom: '',
     };
     return urls[provider] || '';
@@ -387,10 +383,8 @@ export default function APISettingsScreen() {
   const getDefaultModel = (provider) => {
     const models = {
       openai: 'gpt-3.5-turbo',
-      claude: 'claude-3-sonnet-20240229',
       deepseek: 'deepseek-chat',
       qwen: 'qwen-turbo',
-      wenxin: 'ernie-bot',
       custom: '',
     };
     return models[provider] || '';
@@ -751,16 +745,6 @@ export default function APISettingsScreen() {
       <TouchableOpacity style={styles.saveButton} onPress={saveSettings}>
         <Text style={styles.saveButtonText}>保存设置</Text>
       </TouchableOpacity>
-
-      <View style={styles.infoSection}>
-        <Text style={styles.infoTitle}>支持的大模型</Text>
-        <Text style={styles.infoText}>• OpenAI (GPT-4, GPT-3.5)</Text>
-        <Text style={styles.infoText}>• Claude (Claude-3)</Text>
-        <Text style={styles.infoText}>• DeepSeek</Text>
-        <Text style={styles.infoText}>• 通义千问</Text>
-        <Text style={styles.infoText}>• 文心一言</Text>
-        <Text style={styles.infoText}>• 其他兼容OpenAI格式的API</Text>
-      </View>
     </ScrollView>
   );
 }
@@ -948,12 +932,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  infoSection: {
-    backgroundColor: '#fff',
-    margin: 16,
-    padding: 16,
-    borderRadius: 8,
-  },
   hint: {
     fontSize: 12,
     color: '#999',
@@ -967,16 +945,5 @@ const styles = StyleSheet.create({
   exampleText: {
     color: '#4A90D9',
     fontFamily: 'monospace',
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 22,
   },
 });

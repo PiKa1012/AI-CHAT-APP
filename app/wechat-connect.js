@@ -314,7 +314,6 @@ function getDefaultBaseUrl(provider) {
   const urls = {
     openai: 'https://api.openai.com', deepseek: 'https://api.deepseek.com',
     qwen: 'https://dashscope.aliyuncs.com/compatible-mode',
-    wenxin: 'https://aip.baidubce.com', claude: 'https://api.anthropic.com',
   };
   return urls[provider] || 'https://api.deepseek.com';
 }
@@ -322,7 +321,7 @@ function getDefaultBaseUrl(provider) {
 function getDefaultModel(provider) {
   const models = {
     openai: 'gpt-3.5-turbo', deepseek: 'deepseek-chat',
-    qwen: 'qwen-turbo', claude: 'claude-3-sonnet-20240229', wenxin: 'ernie-bot',
+    qwen: 'qwen-turbo',
   };
   return models[provider] || 'deepseek-chat';
 }
