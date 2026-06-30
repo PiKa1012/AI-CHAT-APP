@@ -5,23 +5,18 @@ import { sendLocalNotification } from './notification';
 import { generateDiary } from './diary';
 import { generateProactiveMessage } from './proactive';
 import { getBeijingNow } from '../utils/time';
-import { saveSetting, loadSetting } from './settings';
 import * as Notifications from 'expo-notifications';
 
 let schedulerInterval = null;
-let lastAutoPostCheck = null;
-let lastAutoDiaryCheck = null;
 const executedTaskIds = new Set();
 
 export function startScheduler() {
   if (schedulerInterval) return;
 
   schedulerInterval = setInterval(async () => {
-    await checkAutoPostSettings();
     await checkDueScheduledTasks();
   }, 60000);
 
-  checkAutoPostSettings();
   checkDueScheduledTasks();
   syncScheduledTasksToNotifications();
 }
@@ -75,27 +70,6 @@ export async function syncScheduledTasksToNotifications() {
   } catch (error) {
     console.error('同步定时任务失败:', error);
   }
-}
-
-async function getAutoPostSettings() {
-  try {
-    return await loadSetting('auto_post_settings', {
-      autoMomentEnabled: false,
-      autoMomentInterval: 4,
-      autoDiaryEnabled: false,
-      autoDiaryTime: '22:00',
-      autoGroupChatEnabled: false,
-      autoGroupChatInterval: 6,
-    });
-  } catch (e) {}
-  return {
-    autoMomentEnabled: false,
-    autoMomentInterval: 4,
-    autoDiaryEnabled: false,
-    autoDiaryTime: '22:00',
-    autoGroupChatEnabled: false,
-    autoGroupChatInterval: 6,
-  };
 }
 
 async function checkDueScheduledTasks() {
@@ -181,38 +155,6 @@ export async function executeScheduledTask(taskId) {
     await executeUpdate('UPDATE scheduled_tasks SET is_active = 0, executed_count = executed_count + 1 WHERE id = ?', [taskId]);
   } else {
     await executeUpdate('UPDATE scheduled_tasks SET executed_count = executed_count + 1 WHERE id = ?', [taskId]);
-  }
-}
-
-async function autoPostMoment() {
-  try {
-    const ais = await executeQuery('SELECT * FROM ai_characters WHERE is_active = 1');
-    if (ais.length === 0) return;
-
-    const randomAI = ais[Math.floor(Math.random() * ais.length)];
-    await aiAutoPostMoment(randomAI.id);
-  } catch (error) {
-    console.error('发朋友圈失败:', error.message || error);
-  }
-}
-
-async function autoWriteDiary() {
-  try {
-    const ais = await executeQuery('SELECT * FROM ai_characters WHERE is_active = 1');
-    for (const ai of ais) {
-      try {
-        const diary = await generateDiary(ai.id);
-        await sendLocalNotification(
-          '新日记',
-          `${ai.name}写了一篇日记：${diary.title}`,
-          { type: 'diary', aiId: ai.id }
-        );
-      } catch (e) {
-        console.error(`生成日记失败 (${ai.name}):`, e.message || e);
-      }
-    }
-  } catch (error) {
-    console.error('写日记失败:', error.message || error);
   }
 }
 
@@ -336,7 +278,7 @@ async function executeWriteDiary(task) {
   try {
     const ais = task.ai_id 
       ? await executeQuery('SELECT * FROM ai_characters WHERE id = ? AND is_active = 1', [task.ai_id])
-      : await executeQuery('SELECT * FROM ai_characters WHERE is_active = 1');
+      : await executeQuery('SELECT * FROM ai_characters WHERE is_active = 1 ORDER BY RANDOM() LIMIT 1');
 
     for (const ai of ais) {
       try {
@@ -388,10 +330,4 @@ export async function getAIScheduledTasks(aiId) {
   );
 }
 
-export async function saveAutoPostSettings(settings) {
-  await saveSetting('auto_post_settings', settings);
-}
 
-export async function getAutoPostSettingsExport() {
-  return await getAutoPostSettings();
-}

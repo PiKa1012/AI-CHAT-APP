@@ -2,6 +2,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Keyboard
 import { useLocalSearchParams, useRouter, useFocusEffect, useNavigation } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { getAIResponse, getGroupAIResponse, findMentionedAI, analyzeImage, aiAutoPostMoment } from '../../src/services/ai';
+import { generateDiary } from '../../src/services/diary';
 import { generateChatImage, isImageGenerationRequest, extractImageDescription } from '../../src/services/imageGen';
 import { detectAndCreateTask, getTaskTypeName } from '../../src/services/taskDetector';
 import { speakText, stopSpeaking, isSpeaking } from '../../src/services/voice';
@@ -526,6 +527,18 @@ export default function ChatScreen() {
             await sendMessage(parseInt(id), 'ai', aiId, response.emoji, 'emoji');
           }
           setIsTyping(false);
+
+          setImmediate(async () => {
+            const todayUserMsgs = messages.filter(m => {
+              if (m.sender_type !== 'user') return false;
+              const d = new Date(m.created_at);
+              d.setHours(d.getHours() + 8);
+              return d.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+            });
+            if (todayUserMsgs.length >= 5 && todayUserMsgs.length % 5 === 0) {
+              try { await generateDiary(aiId); } catch (e) {}
+            }
+          });
 
           const ai = aiCharacters.find(a => a.id === aiId);
           await sendLocalNotification(

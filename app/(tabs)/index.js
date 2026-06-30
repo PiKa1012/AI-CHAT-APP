@@ -2,7 +2,8 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Modal } from
 import { useRouter } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { formatTime, formatDate } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 
@@ -20,11 +21,11 @@ export default function HomeScreen() {
   const [groupSelectorVisible, setGroupSelectorVisible] = useState(false);
   const [selectedAIs, setSelectedAIs] = useState([]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadConversations();
     loadAICharacters();
     checkUnreadMessages();
-  }, []);
+  }, []));
 
   const onRefresh = async () => {
     setRefreshing(true);
