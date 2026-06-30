@@ -30,6 +30,7 @@ export default function ChatScreen() {
   const loadMessages = useAppStore(s => s.loadMessages);
   const loadMoreMessages = useAppStore(s => s.loadMoreMessages);
   const sendMessage = useAppStore(s => s.sendMessage);
+  const markConversationAsRead = useAppStore(s => s.markConversationAsRead);
   const conversations = useAppStore(s => s.conversations);
   const loadConversations = useAppStore(s => s.loadConversations);
   const aiCharacters = useAppStore(s => s.aiCharacters);
@@ -78,6 +79,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (id) {
       loadMessages(parseInt(id));
+      markConversationAsRead(parseInt(id));
     }
     loadEmojiPacks();
     loadUserProfile();
@@ -85,6 +87,15 @@ export default function ChatScreen() {
       loadGroupMembers();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (id && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg.sender_type === 'ai' && lastMsg.conversation_id === parseInt(id) && !lastMsg.is_read) {
+        markConversationAsRead(parseInt(id));
+      }
+    }
+  }, [messages.length]);
 
   useFocusEffect(
     useCallback(() => {

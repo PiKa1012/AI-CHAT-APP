@@ -234,6 +234,13 @@ export const useAppStore = create((set, get) => ({
     );
   },
 
+  markConversationAsRead: async (conversationId) => {
+    await executeUpdate(
+      'UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND is_read = 0',
+      [conversationId]
+    );
+  },
+
   sendMessage: async (conversationId, senderType, senderId, content, messageType = 'text') => {
     const now = new Date();
     const utcStr = now.toISOString();
@@ -243,6 +250,13 @@ export const useAppStore = create((set, get) => ({
     );
     const message = { id, conversation_id: conversationId, sender_type: senderType, sender_id: senderId, content, message_type: messageType, media_url: null, is_read: 0, created_at: utcStr };
     set((state) => ({ messages: [...state.messages, message] }));
+    set((state) => ({
+      conversations: state.conversations.map(c =>
+        c.id === conversationId
+          ? { ...c, last_message: content, last_message_type: messageType, last_message_time: utcStr }
+          : c
+      )
+    }));
     return id;
   },
 
