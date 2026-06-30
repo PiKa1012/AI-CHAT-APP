@@ -65,8 +65,43 @@ export async function generateAndSaveImage(prompt, folder = 'generated') {
   }
 }
 
-export async function generateMomentImage(content) {
-  const prompt = `根据以下内容生成一张适合发朋友圈的配图，风格清新自然：${content}`;
+export async function generateMomentImage(imagePrompt, character = null, user = null) {
+  let desc = '';
+  if (character && user) {
+    const aiName = character.name || 'AI';
+    const aiGender = character.gender || '';
+    const aiAge = character.age ? character.age + '岁' : '';
+    const aiBackground = character.background || '';
+    const aiLikes = character.likes || '';
+    const aiDesc = character.description || '';
+    const userName = user.name || '用户';
+    const userGender = user.gender || '';
+
+    let peopleDesc = '';
+    if (userGender && aiGender) {
+      if (userGender === aiGender) {
+        peopleDesc = userGender === 'male' ? '两个男生' : '两个女生';
+      } else {
+        peopleDesc = '一男一女';
+      }
+    } else {
+      peopleDesc = '两个人';
+    }
+
+    const aiInfo = [aiGender, aiAge, aiBackground, aiLikes, aiDesc].filter(Boolean).join('，');
+    desc = `（${peopleDesc}，${userName}和${aiName}${aiInfo ? '，' + aiName + '是' + aiInfo : ''}）`;
+  } else if (character) {
+    const parts = [
+      character.gender || '',
+      character.age ? character.age + '岁' : '',
+      character.background || '',
+      character.likes || '',
+      character.description || '',
+    ].filter(Boolean);
+    const name = character.name || '';
+    desc = `（人物是${name}${parts.length > 0 ? '，' + parts.join('，') : ''}）`;
+  }
+  const prompt = `朋友圈配图${desc}，画面写实温暖，包含人物和场景：${imagePrompt}`;
   return await generateAndSaveImage(prompt, 'generated');
 }
 
