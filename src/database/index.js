@@ -146,7 +146,7 @@ async function initDatabase(database) {
       tags TEXT DEFAULT '[]',
       images TEXT DEFAULT '[]',
       is_public INTEGER DEFAULT 0,
-      created_at DATE DEFAULT (date('now')),
+      created_at DATETIME DEFAULT (datetime('now', '+8 hours')),
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (ai_id) REFERENCES ai_characters(id)
     );

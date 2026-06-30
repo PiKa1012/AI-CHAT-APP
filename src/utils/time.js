@@ -11,7 +11,8 @@ function parseToUTC(dateStr) {
     if (dateStr.includes('T') || dateStr.includes('Z')) {
       return new Date(dateStr);
     } else {
-      return new Date(dateStr.replace(' ', 'T') + 'Z');
+      const d = new Date(dateStr.replace(' ', 'T'));
+      return isNaN(d.getTime()) ? new Date() : d;
     }
   }
   return new Date(dateStr);
