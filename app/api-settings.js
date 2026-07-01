@@ -206,10 +206,6 @@ export default function APISettingsScreen() {
       Alert.alert('提示', '请先输入服务器地址');
       return;
     }
-    if (!xfAppId || !xfApiKey || !xfApiSecret) {
-      Alert.alert('提示', '请先填写完整的讯飞 ASR 凭据');
-      return;
-    }
     setIsTestingVoice(true);
     try {
       // 测试服务器 WebSocket 是否可达
@@ -219,7 +215,7 @@ export default function APISettingsScreen() {
         ws.onopen = () => { clearTimeout(t); ws.close(); resolve(); };
         ws.onerror = () => { clearTimeout(t); reject(new Error('无法连接')); };
       });
-      Alert.alert('成功', '服务器连接正常（仅测试 WebSocket 可达，讯飞 ASR 需拨打电话时验证）');
+      Alert.alert('成功', '服务器连接正常');
     } catch (e) {
       Alert.alert('失败', `连接错误: ${e.message}`);
     }
