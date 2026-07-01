@@ -50,13 +50,11 @@ class XunfeiASR {
           domain: 'iat',
           accent: 'mandarin',
           vad_eos: 2000,
-          dwa: 'wpgs',
-          pd: 'game',
         },
         data: {
           status: 0,
-          format: 'audio/L16;rate=16000',
-          encoding: 'raw',
+          format: 'audio/amr;rate=8000',
+          encoding: 'amr',
           audio: '',
         },
       };
@@ -88,11 +86,12 @@ class XunfeiASR {
 
   sendAudio(data) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (data[0] === 0x23 && data[1] === 0x21) data = data.slice(6);
     const frame = {
       data: {
         status: 1,
-        format: 'audio/L16;rate=16000',
-        encoding: 'raw',
+        format: 'audio/amr;rate=8000',
+        encoding: 'amr',
         audio: data.toString('base64'),
       },
     };
@@ -104,8 +103,8 @@ class XunfeiASR {
     const frame = {
       data: {
         status: 2,
-        format: 'audio/L16;rate=16000',
-        encoding: 'raw',
+        format: 'audio/amr;rate=8000',
+        encoding: 'amr',
         audio: '',
       },
     };

@@ -4,7 +4,6 @@
   "private": true,
   "dependencies": {
     "cors": "^2.8.5",
-    "edge-tts": "^1.0.1",
     "express": "^4.21.0",
     "qrcode": "^1.5.4",
     "uuid": "^14.0.1",

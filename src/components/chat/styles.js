@@ -127,6 +127,67 @@ export const styles = StyleSheet.create({
     marginLeft: 8,
     padding: 2,
   },
+  audioBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  audioWave: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    height: 30,
+  },
+  audioWaveBar: {
+    width: 4,
+    borderRadius: 2,
+  },
+  audioWaveBarActive: {
+    opacity: 0.7,
+  },
+  audioDuration: {
+    fontSize: 13,
+    color: '#999',
+    minWidth: 32,
+  },
+  audioDurationUser: {
+    color: 'rgba(255,255,255,0.8)',
+  },
+  recordButton: {
+    padding: 8,
+    marginRight: 2,
+  },
+  recordingActive: {
+    backgroundColor: '#fce4e4',
+    borderRadius: 20,
+  },
+  recordingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#e74c3c',
+  },
+  recordingText: {
+    fontSize: 14,
+    color: '#e74c3c',
+    fontWeight: '500',
+  },
   typingContainer: {
     padding: 8,
     paddingHorizontal: 16,

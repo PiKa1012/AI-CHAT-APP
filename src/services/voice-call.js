@@ -5,12 +5,11 @@ import { loadSetting } from './settings';
 const CHUNK_MS = 500;
 const AUDIO_OPTIONS = {
   android: {
-    extension: '.wav',
-    outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-    audioEncoder: Audio.AndroidAudioEncoder.AAC,
-    sampleRate: 16000,
+    extension: '.amr',
+    outputFormat: Audio.AndroidOutputFormat.AMR_NB,
+    audioEncoder: Audio.AndroidAudioEncoder.AMR_NB,
+    sampleRate: 8000,
     numberOfChannels: 1,
-    bitRate: 64000,
   },
   ios: {
     extension: '.wav',

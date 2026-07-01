@@ -11,40 +11,13 @@ const AI_PROVIDERS = [
   { id: 'custom', name: '自定义', icon: '⚙️', placeholder: '输入API地址' },
 ];
 
-const TTS_PROVIDERS = [
-  { id: 'system', name: '系统语音', desc: '手机自带，无需联网' },
-  { id: 'mimo', name: 'MiMo语音', desc: '小米MiMo TTS' },
-  { id: 'edge', name: 'Edge语音', desc: '微软免费语音' },
-  { id: 'openai', name: 'OpenAI语音', desc: '高质量但需付费' },
+const SYSTEM_VOICES = [
+  { id: '默认', name: '默认' },
+  { id: '甜美', name: '甜美' },
+  { id: '磁性', name: '磁性' },
+  { id: '可爱', name: '可爱' },
+  { id: '成熟', name: '成熟' },
 ];
-
-const VOICE_OPTIONS = {
-  system: [
-    { id: '默认', name: '默认' },
-    { id: '甜美', name: '甜美' },
-    { id: '磁性', name: '磁性' },
-    { id: '可爱', name: '可爱' },
-    { id: '成熟', name: '成熟' },
-  ],
-  mimo: [
-    { id: 'mimo-zh_female', name: '中文女声' },
-    { id: 'mimo-zh_male', name: '中文男声' },
-    { id: 'mimo-en_female', name: '英文女声' },
-    { id: 'mimo-en_male', name: '英文男声' },
-  ],
-  edge: [
-    { id: 'edge-xiaoxiao', name: '晓晓(女)' },
-    { id: 'edge-yunxi', name: '云希(男)' },
-    { id: 'edge-xiaoyi', name: '晓伊(女)' },
-    { id: 'edge-yunjian', name: '云健(男)' },
-  ],
-  openai: [
-    { id: 'openai-alloy', name: 'Alloy(中性)' },
-    { id: 'openai-echo', name: 'Echo(男)' },
-    { id: 'openai-nova', name: 'Nova(女)' },
-    { id: 'openai-shimmer', name: 'Shimmer(女)' },
-  ],
-};
 
 const FREQUENCY_OPTIONS = [
   { value: 10, label: '低' },
@@ -64,11 +37,8 @@ export default function APISettingsScreen() {
   
   // TTS settings
   const [enableTTS, setEnableTTS] = useState(true);
-  const [ttsProvider, setTtsProvider] = useState('system');
   const [ttsVoice, setTtsVoice] = useState('默认');
-  const [ttsApiKey, setTtsApiKey] = useState('');
-  const [ttsApiBaseUrl, setTtsApiBaseUrl] = useState('');
-  
+
   // Emoji settings
   const [enableEmoji, setEnableEmoji] = useState(true);
   const [emojiFrequency, setEmojiFrequency] = useState(30);
@@ -100,15 +70,16 @@ export default function APISettingsScreen() {
 
   // Voice call settings
   const [enableVoiceCall, setEnableVoiceCall] = useState(false);
+  const [voiceServerUrl, setVoiceServerUrl] = useState('');
   const [xfAppId, setXfAppId] = useState('');
   const [xfApiKey, setXfApiKey] = useState('');
   const [xfApiSecret, setXfApiSecret] = useState('');
-  const [voiceServerUrl, setVoiceServerUrl] = useState('');
+  const [enableAIVoiceMsg, setEnableAIVoiceMsg] = useState(false);
+  const [aiVoiceMsgFrequency, setAiVoiceMsgFrequency] = useState(30);
 
   const [isTesting, setIsTesting] = useState(false);
   const [isTestingVoice, setIsTestingVoice] = useState(false);
   const [isTestingVision, setIsTestingVision] = useState(false);
-  const [isTestingTTS, setIsTestingTTS] = useState(false);
   const [isTestingImageGen, setIsTestingImageGen] = useState(false);
   const [isTestingSearch, setIsTestingSearch] = useState(false);
 
@@ -127,10 +98,7 @@ export default function APISettingsScreen() {
         setEnableSearch(data.enableSearch || false);
         setSearchApiKey(data.searchApiKey || '');
         setEnableTTS(data.enableTTS !== false);
-        setTtsProvider(data.ttsProvider || 'system');
         setTtsVoice(data.ttsVoice || '默认');
-        setTtsApiKey(data.ttsApiKey || '');
-        setTtsApiBaseUrl(data.ttsApiBaseUrl || '');
         setEnableEmoji(data.enableEmoji !== false);
         setEmojiFrequency(data.emojiFrequency || 30);
         setEnableImageRecognition(data.enableImageRecognition || false);
@@ -153,6 +121,8 @@ export default function APISettingsScreen() {
         setXfApiKey(data.xfApiKey || '');
         setXfApiSecret(data.xfApiSecret || '');
         setVoiceServerUrl(data.voiceServerUrl || '');
+        setEnableAIVoiceMsg(data.enableAIVoiceMsg || false);
+        setAiVoiceMsgFrequency(data.aiVoiceMsgFrequency || 30);
       }
     } catch (e) {}
   };
@@ -232,10 +202,7 @@ export default function APISettingsScreen() {
         enableSearch,
         searchApiKey,
         enableTTS,
-        ttsProvider,
         ttsVoice,
-        ttsApiKey,
-        ttsApiBaseUrl,
         enableEmoji,
         emojiFrequency,
         enableImageRecognition,
@@ -258,6 +225,8 @@ export default function APISettingsScreen() {
         xfApiKey,
         xfApiSecret,
         voiceServerUrl,
+        enableAIVoiceMsg,
+        aiVoiceMsgFrequency,
       });
       clearAPISettingsCache();
       Alert.alert('成功', '设置已保存');
@@ -334,44 +303,6 @@ export default function APISettingsScreen() {
       Alert.alert('失败', `网络错误: ${e.message}`);
     }
     setIsTestingVision(false);
-  };
-
-  const testTTSConnection = async () => {
-    if (ttsProvider === 'system') {
-      Alert.alert('提示', '系统语音无需测试');
-      return;
-    }
-    if (!ttsApiKey) {
-      Alert.alert('提示', '请先输入语音API Key');
-      return;
-    }
-    setIsTestingTTS(true);
-    try {
-      const baseUrl = ttsApiBaseUrl || 'https://api.example.com';
-      
-      const response = await fetch(`${baseUrl}/v1/audio/speech`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${ttsApiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'tts-1',
-          input: '你好',
-          voice: 'alloy',
-        }),
-      });
-      
-      if (response.ok) {
-        Alert.alert('成功', '语音API连接正常！');
-      } else {
-        const error = await response.text();
-        Alert.alert('失败', `连接错误: ${error}`);
-      }
-    } catch (e) {
-      Alert.alert('失败', `网络错误: ${e.message}`);
-    }
-    setIsTestingTTS(false);
   };
 
   const testSearchConnection = async () => {
@@ -547,34 +478,20 @@ export default function APISettingsScreen() {
           </View>
         )}
 
-        {/* 语音回复 */}
+        {/* 消息朗读 */}
         <View style={styles.switchRow}>
           <View style={styles.switchInfo}>
             <Ionicons name="volume-high" size={20} color="#67C23A" />
-            <Text style={styles.switchLabel}>语音回复</Text>
-            <Text style={styles.switchDesc}>AI消息自动朗读</Text>
+            <Text style={styles.switchLabel}>消息朗读</Text>
+            <Text style={styles.switchDesc}>点击小喇叭朗读AI文字消息</Text>
           </View>
           <Switch value={enableTTS} onValueChange={setEnableTTS} trackColor={{ true: '#67C23A' }} />
         </View>
         {enableTTS && (
           <View style={styles.subSection}>
-            <Text style={styles.label}>语音引擎</Text>
-            <View style={styles.optionGrid}>
-              {TTS_PROVIDERS.map(provider => (
-                <TouchableOpacity
-                  key={provider.id}
-                  style={[styles.optionItem, ttsProvider === provider.id && styles.optionItemActive]}
-                  onPress={() => { setTtsProvider(provider.id); setTtsVoice(VOICE_OPTIONS[provider.id][0].id); }}
-                >
-                  <Text style={[styles.optionName, ttsProvider === provider.id && styles.optionNameActive]}>{provider.name}</Text>
-                  <Text style={styles.optionDesc}>{provider.desc}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.label}>音色选择</Text>
+            <Text style={styles.label}>音色</Text>
             <View style={styles.voiceGrid}>
-              {VOICE_OPTIONS[ttsProvider]?.map(voice => (
+              {SYSTEM_VOICES.map(voice => (
                 <TouchableOpacity
                   key={voice.id}
                   style={[styles.voiceItem, ttsVoice === voice.id && styles.voiceItemActive]}
@@ -584,31 +501,6 @@ export default function APISettingsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-
-            {ttsProvider !== 'system' && (
-              <>
-                <Text style={styles.label}>语音API Key</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ttsApiKey}
-                  onChangeText={setTtsApiKey}
-                  placeholder="输入语音API Key"
-                  placeholderTextColor="#999"
-                  secureTextEntry
-                />
-                <Text style={styles.label}>语音API地址</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ttsApiBaseUrl}
-                  onChangeText={setTtsApiBaseUrl}
-                  placeholder="如 https://api.example.com"
-                  placeholderTextColor="#999"
-                />
-                <TouchableOpacity style={styles.testSmallButton} onPress={testTTSConnection} disabled={isTestingTTS}>
-                  <Text style={styles.testSmallButtonText}>{isTestingTTS ? '测试中...' : '测试语音连接'}</Text>
-                </TouchableOpacity>
-              </>
-            )}
           </View>
         )}
 
@@ -850,7 +742,7 @@ export default function APISettingsScreen() {
               style={styles.input}
               value={voiceServerUrl}
               onChangeText={setVoiceServerUrl}
-              placeholder="ws://你的服务器IP:3001/voice"
+              placeholder="ws://你的服务器IP:3002/voice"
               placeholderTextColor="#999"
             />
             <Text style={styles.hint}>运行 bridge 服务的服务器地址，端口 3001</Text>
@@ -858,6 +750,33 @@ export default function APISettingsScreen() {
             <TouchableOpacity style={styles.testSmallButton} onPress={testVoiceConnection} disabled={isTestingVoice}>
               <Text style={styles.testSmallButtonText}>{isTestingVoice ? '测试中...' : '测试连接'}</Text>
             </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.switchRow}>
+          <View style={styles.switchInfo}>
+            <Ionicons name="mic-outline" size={20} color="#9B59B6" />
+            <Text style={styles.switchLabel}>AI语音消息</Text>
+            <Text style={styles.switchDesc}>AI以语音条回复</Text>
+          </View>
+          <Switch value={enableAIVoiceMsg} onValueChange={setEnableAIVoiceMsg} trackColor={{ true: '#9B59B6' }} />
+        </View>
+        {enableAIVoiceMsg && (
+          <View style={styles.subSection}>
+            <Text style={styles.label}>语音频率</Text>
+            <View style={styles.optionGrid}>
+              {[{ value: 10, label: '10%' }, { value: 30, label: '30%' }, { value: 50, label: '50%' }, { value: 100, label: '每次' }].map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.optionItem, aiVoiceMsgFrequency === opt.value && styles.optionItemActive]}
+                  onPress={() => setAiVoiceMsgFrequency(opt.value)}
+                >
+                  <Text style={[styles.optionName, aiVoiceMsgFrequency === opt.value && styles.optionNameActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
       </View>
@@ -977,7 +896,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   switchLabel: {
     fontSize: 15,
@@ -986,8 +906,6 @@ const styles = StyleSheet.create({
   switchDesc: {
     fontSize: 12,
     color: '#999',
-    marginLeft: 'auto',
-    marginRight: 10,
   },
   optionGrid: {
     flexDirection: 'row',

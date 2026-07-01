@@ -74,7 +74,6 @@ export default function RootLayout() {
         <Stack.Screen name="emoji-manage" options={{ title: '表情包管理' }} />
         <Stack.Screen name="profile" options={{ title: '我的资料' }} />
         <Stack.Screen name="chat-background" options={{ title: '聊天背景' }} />
-        <Stack.Screen name="voice-settings" options={{ title: '语音设置' }} />
         <Stack.Screen name="chat-history" options={{ title: '聊天记录搜索' }} />
         <Stack.Screen name="chat-detail-history" options={{ title: '聊天历史' }} />
         <Stack.Screen name="group-settings" options={{ title: '群聊设置' }} />

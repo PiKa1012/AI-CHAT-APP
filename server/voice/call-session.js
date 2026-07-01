@@ -1,4 +1,4 @@
-const EdgeTTSService = require('./tts-edge');
+const XunfeiTTS = require('./tts-edge');
 const XunfeiASR = require('./asr-xf');
 const crypto = require('crypto');
 
@@ -14,7 +14,7 @@ class CallSession {
     this.ws = ws;
     this.config = config;
     this.state = STATES.IDLE;
-    this.tts = new EdgeTTSService();
+    this.tts = new XunfeiTTS(xfConfig);
     this.asr = new XunfeiASR(
       xfConfig.xfAppId || process.env.XF_APPID,
       xfConfig.xfApiKey || process.env.XF_API_KEY,
@@ -46,7 +46,9 @@ class CallSession {
     this.send({ type: 'connected' });
 
     // 初始问候
+    this.llmStreaming = true;
     await this.speak('喂你好，我是你的AI伙伴，现在可以开始聊天了。');
+    this.llmStreaming = false;
     this.listen();
   }
 
@@ -241,6 +243,7 @@ class CallSession {
   async speak(text) {
     if (!text?.trim() || this.state !== STATES.CONNECTED) return;
 
+    console.log(`[TTS] 开始合成 (${this.sessionId.slice(0,8)}): "${text.slice(0,30)}..."`);
     this.send({ type: 'tts_start' });
 
     try {
@@ -248,8 +251,9 @@ class CallSession {
         if (this.state !== STATES.CONNECTED || !this.llmStreaming) break;
         this.send({ type: 'audio', data: chunk.toString('base64'), format: 'mp3' });
       }
+      console.log(`[TTS] 合成完成`);
     } catch (err) {
-      console.error(`[TTS错误]`, err.message);
+      console.error(`[TTS错误 ${this.sessionId.slice(0,8)}]`, err.message);
     }
 
     this.send({ type: 'tts_end' });

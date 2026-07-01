@@ -241,14 +241,14 @@ export const useAppStore = create((set, get) => ({
     );
   },
 
-  sendMessage: async (conversationId, senderType, senderId, content, messageType = 'text') => {
+  sendMessage: async (conversationId, senderType, senderId, content, messageType = 'text', mediaUrl = null) => {
     const now = new Date();
     const utcStr = now.toISOString();
     const id = await executeInsert(
-      'INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      [conversationId, senderType, senderId, content, messageType, utcStr]
+      'INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, media_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [conversationId, senderType, senderId, content, messageType, mediaUrl, utcStr]
     );
-    const message = { id, conversation_id: conversationId, sender_type: senderType, sender_id: senderId, content, message_type: messageType, media_url: null, is_read: 0, created_at: utcStr };
+    const message = { id, conversation_id: conversationId, sender_type: senderType, sender_id: senderId, content, message_type: messageType, media_url: mediaUrl, is_read: 0, created_at: utcStr };
     set((state) => ({ messages: [...state.messages, message] }));
     set((state) => ({
       conversations: state.conversations.map(c =>

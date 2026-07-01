@@ -4,14 +4,10 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const QRCode = require('qrcode');
-const createVoiceWSServer = require('./voice/ws-server');
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
-
-// 共享配置
-let sharedConfig = null;
 
 const PORT = process.env.PORT || 3001;
 const CRED_PATH = path.join(__dirname, 'credentials.json');
@@ -263,7 +259,6 @@ app.post('/api/bridge/start', async (req, res) => {
     systemPrompt: systemPrompt || '你是一个友善的AI伙伴',
     maxTokens: maxTokens || 1024,
   };
-  sharedConfig = bridgeState.config;
   fs.writeFileSync(CFG_PATH, JSON.stringify(bridgeState.config, null, 2));
 
   // 如果已有缓存的凭据，尝试恢复运行
@@ -307,11 +302,8 @@ app.post('/api/bridge/stop', (req, res) => {
   res.json({ status: 'idle' });
 });
 
-// 创建 HTTP 服务器（Express + WebSocket 共用）
+// 创建 HTTP 服务器
 const server = http.createServer(app);
-
-// 语音通话 WebSocket
-const voiceWSS = createVoiceWSServer(server, () => sharedConfig);
 
 server.listen(PORT, () => {
   console.log(`桥接服务器已启动，端口 ${PORT}`);
@@ -319,7 +311,7 @@ server.listen(PORT, () => {
   // 自动尝试恢复
   // 从磁盘恢复 config（服务器重启后 config 不会丢）
   if (fs.existsSync(CFG_PATH)) {
-    try { bridgeState.config = JSON.parse(fs.readFileSync(CFG_PATH, 'utf8')); sharedConfig = bridgeState.config; } catch (e) {}
+    try { bridgeState.config = JSON.parse(fs.readFileSync(CFG_PATH, 'utf8')); } catch (e) {}
   }
 
   if (fs.existsSync(CRED_PATH)) {

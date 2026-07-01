@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator, Pressable } from 'react-native';
 import { styles } from '../../src/components/chat/styles';
 import { useLocalSearchParams, useFocusEffect, useNavigation, router } from 'expo-router';
 import { useAppStore } from '../../src/stores';
@@ -10,6 +10,9 @@ import { speakText, stopSpeaking, isSpeaking } from '../../src/services/voice';
 import { sendLocalNotification } from '../../src/services/notification';
 import { getEmojiPacks } from '../../src/services/emoji';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
+import * as Crypto from 'expo-crypto';
+import { HmacSHA256, enc } from 'crypto-js';
 import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
 import { loadSetting } from '../../src/services/settings';
 import * as ImagePicker from 'expo-image-picker';
@@ -25,6 +28,27 @@ import { detectMapIntent, searchNearby, searchByKeyword, getRoute, getWeather, g
 import { executeQuery } from '../../src/database';
 
 
+
+
+const RECORDING_OPTIONS = {
+  android: {
+    extension: '.amr',
+    outputFormat: Audio.AndroidOutputFormat.AMR_NB,
+    audioEncoder: Audio.AndroidAudioEncoder.AMR_NB,
+    sampleRate: 8000,
+    numberOfChannels: 1,
+  },
+  ios: {
+    extension: '.wav',
+    outputFormat: Audio.IOSOutputFormat.LINEARPCM,
+    sampleRate: 16000,
+    numberOfChannels: 1,
+    bitRate: 256000,
+    linearPCMBitDepth: 16,
+    linearPCMIsBigEndian: false,
+    linearPCMIsFloat: false,
+  },
+};
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
@@ -66,11 +90,18 @@ export default function ChatScreen() {
 
   const conversation = conversations.find(c => c.id === parseInt(id));
   const [voiceCallEnabled, setVoiceCallEnabled] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [playingAudioId, setPlayingAudioId] = useState(null);
+  const recordingRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+  const soundRef = useRef(null);
+  const recStatusRef = useRef('idle');
+  const startRecPromiseRef = useRef(null);
 
   useEffect(() => {
     (async () => {
       const settings = await loadSetting('api_settings', {});
-      console.log('[电话] 加载设置:', settings.enableVoiceCall);
       setVoiceCallEnabled(settings.enableVoiceCall || false);
     })();
   }, []);
@@ -264,7 +295,7 @@ export default function ChatScreen() {
               ? `[用户发送了一张图片并说：${commentText}，图片内容：${description}]`
               : `[用户发送了一张图片，内容：${description}]`;
             const response = await getAIResponse(aiId, prompt);
-            await sendMessage(parseInt(id), 'ai', aiId, response.text);
+            await sendAIResponse(aiId, response.text);
           }
         }
       } catch (error) {
@@ -312,7 +343,7 @@ export default function ChatScreen() {
             const aiId = members[0].member_id;
             const recentMessages = messages.slice(-50);
             const response = await getAIResponse(aiId, prompt, recentMessages);
-            await sendMessage(parseInt(id), 'ai', aiId, response.text);
+            await sendAIResponse(aiId, response.text);
           }
         } else {
           const members = await getConversationMembers();
@@ -321,7 +352,7 @@ export default function ChatScreen() {
             const randomAI = memberAIs[Math.floor(Math.random() * memberAIs.length)];
             const recentMessages = messages.slice(-50);
             const response = await getGroupAIResponse(randomAI.id, [...recentMessages, { sender_type: 'user', sender_id: 1, content: prompt }], memberAIs);
-            await sendMessage(parseInt(id), 'ai', randomAI.id, response.text);
+            await sendAIResponse(randomAI.id, response.text);
           }
         }
       } catch (error) {
@@ -349,7 +380,7 @@ export default function ChatScreen() {
             const aiId = members[0].member_id;
             const recentMessages = messages.slice(-50);
             const response = await getAIResponse(aiId, emojiText, recentMessages);
-            await sendMessage(parseInt(id), 'ai', aiId, response.text);
+            await sendAIResponse(aiId, response.text);
             setIsTyping(false);
           }
         } else {
@@ -360,7 +391,7 @@ export default function ChatScreen() {
             const randomAI = memberAIs[Math.floor(Math.random() * memberAIs.length)];
             const recentMessages = messages.slice(-20);
             const response = await getGroupAIResponse(randomAI.id, [...recentMessages, { sender_type: 'user', sender_id: 1, content: emojiText }], memberAIs);
-            await sendMessage(parseInt(id), 'ai', randomAI.id, response.text);
+            await sendAIResponse(randomAI.id, response.text);
             setIsTyping(false);
           }
         }
@@ -536,7 +567,7 @@ export default function ChatScreen() {
           const aiId = members[0].member_id;
           const recentMessages = messages.slice(-50);
           const response = await getAIResponse(aiId, messageText, recentMessages);
-          await sendMessage(parseInt(id), 'ai', aiId, response.text);
+          await sendAIResponse(aiId, response.text);
           if (response.emoji) {
             await sendMessage(parseInt(id), 'ai', aiId, response.emoji, 'emoji');
           }
@@ -574,7 +605,7 @@ export default function ChatScreen() {
           const delay = Math.random() * 1500 + 500;
           await new Promise(resolve => setTimeout(resolve, delay));
           const response = await getGroupAIResponse(ai.id, msgs, memberAIs);
-          await sendMessage(parseInt(id), 'ai', ai.id, response.text);
+          await sendAIResponse(ai.id, response.text);
           if (response.emoji) {
             await sendMessage(parseInt(id), 'ai', ai.id, response.emoji, 'emoji');
           }
@@ -655,6 +686,276 @@ export default function ChatScreen() {
     setShowEmoji(false);
   };
 
+  const startRecording = async () => {
+    if (recStatusRef.current !== 'idle') return;
+    recStatusRef.current = 'starting';
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        recStatusRef.current = 'idle';
+        return;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+      });
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(RECORDING_OPTIONS);
+      await recording.startAsync();
+      recordingRef.current = recording;
+      recStatusRef.current = 'recording';
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(d => d + 1);
+      }, 1000);
+    } catch (e) {
+      recStatusRef.current = 'idle';
+      recordingRef.current = null;
+      Alert.alert('录音失败', e.message);
+    }
+  };
+
+  const stopRecording = async (send = true) => {
+    if (recStatusRef.current !== 'recording') return;
+    recStatusRef.current = 'stopping';
+    const rec = recordingRef.current;
+    recordingRef.current = null;
+    clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    setIsRecording(false);
+    if (!send || recordingDuration < 1) {
+      try { await rec.stopAndUnloadAsync(); } catch {}
+      recStatusRef.current = 'idle';
+      return;
+    }
+    try {
+      const uri = rec.getURI();
+      await rec.stopAndUnloadAsync();
+      if (!uri) { recStatusRef.current = 'idle'; return; }
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      console.log('[语音] 录音原始文件:', uri, '存在:', fileInfo.exists, '大小:', fileInfo.size);
+      const mins = Math.floor(recordingDuration / 60);
+      const secs = recordingDuration % 60;
+      const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+      const fileName = `voice_${Date.now()}_${Math.random().toString(36).substr(2, 6)}.amr`;
+      const destPath = `${FileSystem.documentDirectory}voice_messages/${fileName}`;
+      await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}voice_messages/`, { intermediates: true });
+      await FileSystem.copyAsync({ from: uri, to: destPath });
+      const destInfo = await FileSystem.getInfoAsync(destPath);
+      console.log('[语音] 复制到:', destPath, '存在:', destInfo.exists, '大小:', destInfo.size);
+      await sendMessage(parseInt(id), 'user', 1, durationStr, 'audio', destPath);
+
+      const transcribed = await transcribeAudio(destPath);
+      const userText = transcribed || '[语音消息]';
+
+      setIsTyping(true);
+      try {
+        if (conversation?.type === 'private') {
+          const members = await getConversationMembers();
+          if (members.length > 0) {
+            const aiId = members[0].member_id;
+            const recentMessages = messages.slice(-50);
+            const response = await getAIResponse(aiId, userText, recentMessages);
+            await sendAIResponse(aiId, response.text);
+          }
+        } else {
+          const members = await getConversationMembers();
+          const memberAIs = members.map(m => aiCharacters.find(a => a.id === m.member_id)).filter(Boolean);
+          if (memberAIs.length > 0) {
+            const randomAI = memberAIs[Math.floor(Math.random() * memberAIs.length)];
+            const recentMessages = messages.slice(-20);
+            const prompt = transcribed ? userText : '[语音消息]';
+            const response = await getGroupAIResponse(randomAI.id, [...recentMessages, { sender_type: 'user', sender_id: 1, content: prompt }], memberAIs);
+            await sendAIResponse(randomAI.id, response.text);
+          }
+        }
+      } catch (e) {
+        console.error('AI回复语音失败:', e);
+      }
+      setIsTyping(false);
+    } catch (e) {
+      console.error('停止录音失败:', e?.message || e);
+    }
+    recStatusRef.current = 'idle';
+  };
+
+  const playVoiceMessage = async (messageId, uri) => {
+    console.log('[播放] 请求播放, uri:', uri, 'messageId:', messageId);
+    if (!uri) { console.log('[播放] uri为空'); return; }
+    const info = await FileSystem.getInfoAsync(uri);
+    console.log('[播放] 文件存在:', info.exists, '大小:', info.size);
+    if (playingAudioId === messageId) {
+      if (soundRef.current) {
+        const status = await soundRef.current.getStatusAsync();
+        if (status.isPlaying) {
+          await soundRef.current.pauseAsync();
+          setPlayingAudioId(null);
+          return;
+        }
+      }
+    }
+    if (soundRef.current) {
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true }
+      );
+      soundRef.current = sound;
+      setPlayingAudioId(messageId);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlayingAudioId(null);
+          sound.unloadAsync();
+          soundRef.current = null;
+        }
+      });
+    } catch (e) {
+      console.error('播放语音失败:', e);
+      Alert.alert('播放失败', '无法播放该语音消息');
+    }
+  };
+
+  const sendAIResponse = async (aiId, text) => {
+    if (!text) return;
+    const settings = await loadSetting('api_settings', {});
+    if (settings.enableAIVoiceMsg && Math.random() * 100 < (settings.aiVoiceMsgFrequency || 30)) {
+      await generateAIVoiceMessage(aiId, text);
+    } else {
+      await sendMessage(parseInt(id), 'ai', aiId, text);
+    }
+  };
+
+  const transcribeAudio = async (audioUri) => {
+    try {
+      const settings = await loadSetting('api_settings', {});
+      const { xfAppId, xfApiKey, xfApiSecret } = settings;
+      if (!xfAppId || !xfApiKey) return null;
+
+      const base64 = await FileSystem.readAsStringAsync(audioUri, { encoding: FileSystem.EncodingType.Base64 });
+      const binaryStr = atob(base64);
+      const amrData = binaryStr.startsWith('#!AMR\n') ? binaryStr.slice(6) : binaryStr;
+      const amrBase64 = btoa(amrData);
+      console.log('[转写] AMR 数据长度:', amrBase64.length);
+
+      const result = await new Promise((resolve) => {
+        let fullText = '';
+        const timer = setTimeout(() => { console.log('[转写] 超时'); resolve(fullText); }, 8000);
+
+        const host = 'iat-api.xfyun.cn';
+        const date = new Date().toUTCString();
+        const signStr = `host: ${host}\ndate: ${date}\nGET /v2/iat HTTP/1.1`;
+        const sig = HmacSHA256(signStr, xfApiSecret).toString(enc.Base64);
+        const auth = btoa(`api_key="${xfApiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${sig}"`);
+        const url = `wss://${host}/v2/iat?authorization=${encodeURIComponent(auth)}&date=${encodeURIComponent(date)}&host=${host}`;
+
+        const ws = new WebSocket(url);
+        ws.onopen = () => {
+          ws.send(JSON.stringify({
+            common: { app_id: xfAppId },
+            business: { language: 'zh_cn', domain: 'iat', accent: 'mandarin', vad_eos: 2000, dwa: 'wpgs', pd: 'game', ptt: 1 },
+            data: { status: 0, format: 'audio/amr;rate=8000', encoding: 'amr', audio: '' },
+          }));
+          const raw = atob(amrBase64);
+          const chunkSize = 1280;
+          for (let i = 0; i < raw.length; i += chunkSize) {
+            const chunk = btoa(raw.slice(i, i + chunkSize));
+            ws.send(JSON.stringify({ data: { status: 1, format: 'audio/amr;rate=8000', encoding: 'amr', audio: chunk } }));
+          }
+          ws.send(JSON.stringify({ data: { status: 2, format: 'audio/amr;rate=8000', encoding: 'amr', audio: '' } }));
+        };
+        ws.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.code !== 0) { console.log('[转写] ASR错误:', msg.code, msg.message); clearTimeout(timer); resolve(fullText); return; }
+            if (msg.data?.result) {
+              const text = msg.data.result.ws?.map(w => w.cw?.map(c => c.w).join('')).join('') || '';
+              fullText += text;
+              if (msg.data.result.pgs === 'rpl') { clearTimeout(timer); resolve(fullText); ws.close(); }
+            }
+          } catch {}
+        };
+        ws.onerror = () => { clearTimeout(timer); resolve(fullText); };
+      });
+      console.log('[转写] 结果:', result);
+      return result || null;
+    } catch (e) { return null; }
+  };
+
+  const generateAIVoiceMessage = async (aiId, text) => {
+    if (!text || text.length < 2) return;
+    try {
+      const settings = await loadSetting('api_settings', {});
+      const voiceSettings = await loadSetting('voice_settings', {});
+      const ai = aiCharacters.find(a => a.id === aiId);
+      const { xfAppId, xfApiKey, xfApiSecret } = settings;
+      if (!xfAppId || !xfApiKey || !xfApiSecret) return;
+
+      const voiceId = ai?.voice_id || voiceSettings.voiceId || 'xiaoyan';
+      const voiceMap = { 'edge-xiaoxiao': 'xiaoyan', 'edge-yunxi': 'aisjiuxu', 'xiaoyan': 'xiaoyan', 'aisjiuxu': 'aisjiuxu' };
+      const voice = voiceMap[voiceId] || 'xiaoyan';
+
+      const result = await new Promise((resolve, reject) => {
+        const host = 'tts-api.xfyun.cn';
+        const date = new Date().toUTCString();
+        const signStr = `host: ${host}\ndate: ${date}\nGET /v2/tts HTTP/1.1`;
+        const sig = HmacSHA256(signStr, xfApiSecret).toString(enc.Base64);
+        const auth = btoa(`api_key="${xfApiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${sig}"`);
+        const url = `wss://${host}/v2/tts?authorization=${encodeURIComponent(auth)}&date=${encodeURIComponent(date)}&host=${host}`;
+
+        const ws = new WebSocket(url);
+        const chunks = [];
+
+        ws.onopen = () => {
+          const textBase64 = btoa(unescape(encodeURIComponent(text)));
+          ws.send(JSON.stringify({
+            common: { app_id: xfAppId },
+            business: { aue: 'lame', sfl: 1, auf: 'audio/L16;rate=16000', vcn: voice, speed: 50, volume: 50, pitch: 50, tte: 'utf8' },
+            data: { text: textBase64, status: 2 },
+          }));
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.code !== 0) { console.log('[AI语音] 讯飞错误:', msg.code, msg.message); ws.close(); resolve(null); return; }
+            if (msg.data?.audio) {
+              const audioBytes = atob(msg.data.audio);
+              chunks.push(audioBytes);
+            }
+            if (msg.data?.status === 2) {
+              ws.close();
+              resolve(chunks.join(''));
+            }
+          } catch { ws.close(); resolve(null); }
+        };
+
+        ws.onerror = () => { resolve(null); };
+        setTimeout(() => { ws.close(); resolve(chunks.join('') || null); }, 10000);
+      });
+
+      if (!result || result.length < 200) return;
+      console.log('[AI语音] 成功,', result.length, 'bytes');
+      const b64 = btoa(result);
+      const fileName = `ai_voice_${Date.now()}.mp3`;
+      const audioUri = `${FileSystem.documentDirectory}voice_messages/${fileName}`;
+      await FileSystem.makeDirectoryAsync(`${FileSystem.documentDirectory}voice_messages/`, { intermediates: true });
+      await FileSystem.writeAsStringAsync(audioUri, b64, { encoding: FileSystem.EncodingType.Base64 });
+      const duration = Math.max(1, Math.ceil(text.length / 4));
+      const mins = Math.floor(duration / 60);
+      const secs = duration % 60;
+      const durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+      await sendMessage(parseInt(id), 'ai', aiId, durationStr, 'audio', audioUri);
+    } catch (e) {
+      console.error('生成AI语音消息失败:', e);
+    }
+  };
+
   const handleVoicePlay = async (messageId, text, voiceId) => {
     const speaking = await isSpeaking();
     if (speaking) {
@@ -710,6 +1011,7 @@ export default function ChatScreen() {
     const isEmoji = item.message_type === 'emoji';
     const isImage = item.message_type === 'image';
     const isMusicList = item.message_type === 'music_list';
+    const isAudio = item.message_type === 'audio';
     const ai = aiCharacters.find(a => a.id === item.sender_id);
     const aiAvatar = ai?.avatar;
     const aiName = ai?.name || 'AI';
@@ -737,6 +1039,37 @@ export default function ChatScreen() {
             </TouchableOpacity>
           ) : isMusicList ? (
             (() => { try { const songs = JSON.parse(item.content || '[]'); return Array.isArray(songs) && songs.length > 0 ? renderMusicList(songs) : <Text style={styles.messageText}>暂无歌曲数据</Text>; } catch (e) { return <Text style={styles.messageText}>歌曲数据解析失败</Text>; }})()
+          ) : isAudio ? (
+            <TouchableOpacity
+              style={styles.audioBubble}
+              onPress={() => playVoiceMessage(item.id, item.media_url)}
+            >
+              <Ionicons
+                name={playingAudioId === item.id ? 'pause-circle' : 'volume-high-outline'}
+                size={24}
+                color={isUser ? '#fff' : '#4A90D9'}
+              />
+              <View style={styles.audioWave}>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.audioWaveBar,
+                      {
+                        height: 8 + i * 3,
+                        backgroundColor: isUser
+                          ? `rgba(255,255,255,${0.3 + i * 0.14})`
+                          : `rgba(74,144,217,${0.3 + i * 0.14})`,
+                      },
+                      playingAudioId === item.id && styles.audioWaveBarActive,
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={[styles.audioDuration, isUser && styles.audioDurationUser]}>
+                {item.content}
+              </Text>
+            </TouchableOpacity>
           ) : (
             <Text style={[styles.messageText, isUser && styles.userMessageText]}>
               {item.content}
@@ -746,7 +1079,7 @@ export default function ChatScreen() {
             <Text style={[styles.messageTime, isUser && styles.userMessageTime]}>
               {formatTime(item.created_at)}
             </Text>
-            {!isUser && !isEmoji && !isImage && (
+            {!isUser && !isEmoji && !isImage && !isAudio && (
               <TouchableOpacity
                 style={styles.voiceButton}
                 onPress={() => handleVoicePlay(item.id, item.content, getAIVoice(item.sender_id))}
@@ -861,6 +1194,17 @@ export default function ChatScreen() {
       {isTyping && (
         <View style={styles.typingContainer}>
           <Text style={styles.typingText}>AI正在输入...</Text>
+        </View>
+      )}
+      {isRecording && (
+        <View style={styles.recordingBar}>
+          <View style={styles.recordingIndicator}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>录音中 {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}</Text>
+          </View>
+          <TouchableOpacity onPress={() => stopRecording(false)}>
+            <Ionicons name="close-circle" size={24} color="#999" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -1008,6 +1352,15 @@ export default function ChatScreen() {
               setShowEmoji(false);
             }}
           />
+          <Pressable
+            style={({ pressed }) => [styles.recordButton, pressed && styles.recordingActive]}
+            onPressIn={startRecording}
+            onPressOut={() => stopRecording(true)}
+          >
+            {({ pressed }) => (
+              <Ionicons name={pressed ? 'mic' : 'mic-outline'} size={22} color="#666" />
+            )}
+          </Pressable>
           <TouchableOpacity
             style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
             onPress={() => handleSend()}
