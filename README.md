@@ -56,11 +56,12 @@
 - 10 种情绪标签（开心、伤心、生气、孤独、惊喜等）
 - 默认 40 个表情预置
 
-### 语音（TTS）
-- 4 种引擎：系统 TTS / MiMo / Edge TTS / OpenAI TTS
-- 支持多种音色选择
-- AI 消息自动朗读
-- 语音输入（按住说话）
+### 语音
+- 语音条：长按录音发送，点击播放，类似微信语音消息
+- AI 语音回复：AI 自动以语音条形式回复，支持频率控制
+- 语音转文字：录音后自动转写（讯飞 ASR），AI 理解语音内容
+- 语音通话：实时 WebSocket 通话（讯飞 TTS + ASR），拨号铃音，打断功能
+- 消息朗读：点击文字消息右下角小喇叭，TTS 朗读
 
 ### API 用量统计
 - 每次 AI 调用记录 Token 用量
@@ -91,12 +92,12 @@
 - **前端：** Expo SDK 52, React Native, Expo Router v4
 - **状态管理：** Zustand
 - **数据库：** expo-sqlite (WAL 模式 + 外键)
-- **后端：** Node.js, Express（微信桥接）
+- **后端：** Node.js, Express（微信桥接）+ WebSocket（语音通话）
 - **微信：** iLink Bot API (ilinkai.weixin.qq.com)
 - **地图：** 高德 Web 服务 API（无 GPS 依赖）
 - **音乐：** NeteaseCloudMusicApi Enhanced
 - **图片生成：** SiliconFlow API (Stable Diffusion)
-- **语音：** expo-speech / Edge TTS / OpenAI TTS
+- **语音：** 讯飞 TTS + ASR / expo-speech
 - **构建：** EAS Build
 
 ## 微信桥接
@@ -131,7 +132,7 @@ App 设置 → 连接微信 → 选择 AI 角色 → 扫码
 #### 1. 安装 Node.js（LTS 版）
 https://nodejs.org
 
-#### 2. 安装依赖
+#### 2. 上传 `server/` 目录到服务器，然后安装依赖
 ```bash
 cd server
 npm install
@@ -139,13 +140,23 @@ npm install
 
 #### 3. 开放防火墙端口（以管理员运行）
 ```powershell
+# 微信桥接
 netsh advfirewall firewall add rule name="WeChatBridge" dir=in action=allow protocol=TCP localport=3001
+# 语音通话
+netsh advfirewall firewall add rule name="VoiceCall" dir=in action=allow protocol=TCP localport=3002
 ```
-如果是阿里云/腾讯云，还需要去**云控制台 → 安全组**添加入方向规则：TCP 3001，授权对象 0.0.0.0/0。
+如果是阿里云/腾讯云，还需要去**云控制台 → 安全组**添加：
+- TCP 3001（微信桥接），授权对象 0.0.0.0/0
+- TCP 3002（语音通话），授权对象 0.0.0.0/0
 
-#### 4. 启动
+#### 4. 启动（两个窗口分别运行）
 ```bash
+# 微信桥接
 node index.js
+```
+```bash
+# 语音通话
+node voice-server.js
 ```
 
 ### App 端操作
@@ -153,12 +164,14 @@ node index.js
 1. 设置 → 连接微信
 2. 服务器地址填 `http://你的服务器IP:3001`
 3. 点**测试连接**确认服务器能通
-4. 选择一个 AI 角色
-5. 点击**连接微信**
-6. App 显示二维码 → 用微信扫码授权
-7. 扫码后自动运行
+4. 选择一个 AI 角色，点击**连接微信**
+5. App 显示二维码 → 用微信扫码授权
 
-> 端口 3001 无需备案，仅用于 App 与服务器的内部通信。
+6. 设置 → API 配置 → 语音通话
+7. 服务器地址填 `ws://你的服务器IP:3002/voice`
+8. 填入讯飞凭据（App ID / API Key / API Secret）
+9. 打开**语音通话**开关
+10. 在私聊中按 ⊕ → 语音通话 发起通话
 
 ## 项目结构
 
@@ -195,7 +208,6 @@ node index.js
 │   ├── scheduled-tasks.js             # 定时任务管理
 │   ├── storage-manage.js              # 存储管理
 │   ├── usage-stats.js                 # API 用量统计
-│   ├── voice-settings.js              # TTS 语音设置
 │   └── wechat-connect.js              # 微信桥接
 ├── src/                               # 核心逻辑
 │   ├── database/
@@ -220,7 +232,8 @@ node index.js
 │   │   ├── settings.js                # 设置持久化
 │   │   ├── taskDetector.js            # 自然语言任务识别
 │   │   ├── usage.js                   # API 用量追踪
-│   │   └── voice.js                   # TTS 语音（4 引擎）
+│   ├── voice.js                   # 系统 TTS 朗读
+│   │   └── voice-call.js            # 语音通话 WebSocket 客户端
 │   ├── components/
 │   │   ├── MusicPlayer.js             # 悬浮迷你播放器（可拖拽）
 │   │   ├── SafeImage.js               # 安全图片组件（失败占位符）
@@ -233,9 +246,15 @@ node index.js
 │   └── utils/
 │       ├── time.js                    # 北京时间 (UTC+8) 工具
 │       └── logger.js                  # 持久化日志 + 全局错误捕获
-├── server/                            # 微信桥接后端
+├── server/                            # 服务器后端
 │   ├── package.json
-│   └── index.js                       # Express 服务器（端口 3001）
+│   ├── index.js                       # 微信桥接（端口 3001）
+│   ├── voice-server.js                # 语音通话（端口 3002）
+│   └── voice/
+│       ├── ws-server.js               # 语音 WebSocket 服务
+│       ├── call-session.js            # 通话会话管理
+│       ├── tts-edge.js                # 讯飞 TTS
+│       └── asr-xf.js                  # 讯飞 ASR
 ├── plugins/
 │   └── withCleartextTraffic.js        # Expo 插件：启用 HTTP 明文流量
 ├── assets/                            # 图标资源

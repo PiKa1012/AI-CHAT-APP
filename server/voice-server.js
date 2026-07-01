@@ -30,5 +30,5 @@ server.listen(PORT, () => {
   console.log(`[语音服务] 已启动, 端口 ${PORT}`);
   console.log(`[语音服务] 读取配置: ${CFG_PATH}`);
   const cfg = getConfig();
-  console.log(`[语音服务] AI 配置: ${cfg ? cfg.model + ' @ ' + cfg.baseUrl : '未配置（需先在微信桥接中配置）'}`);
+  console.log(`[语音服务] AI 配置: ${cfg ? cfg.model + ' @ ' + cfg.baseUrl : '将由 App 在通话时提供'}`);
 });

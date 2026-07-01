@@ -50,9 +50,15 @@ export class VoiceCallService {
         xfApiKey: settings.xfApiKey || '',
         xfApiSecret: settings.xfApiSecret || '',
       };
+      this.aiConfig = {
+        baseUrl: settings.apiBaseUrl || 'https://api.deepseek.com',
+        apiKey: settings.apiKey || '',
+        model: settings.modelName || 'deepseek-chat',
+      };
     } catch (e) {
       this.wsUrl = '';
       this.xfConfig = { xfAppId: '', xfApiKey: '', xfApiSecret: '' };
+      this.aiConfig = { baseUrl: 'https://api.deepseek.com', apiKey: '', model: 'deepseek-chat' };
     }
 
     if (!this.wsUrl) {
@@ -84,6 +90,7 @@ export class VoiceCallService {
         type: 'dial',
         characterId,
         xfConfig: this.xfConfig,
+        apiConfig: this.aiConfig,
       }));
       this.startRecordingLoop();
     };

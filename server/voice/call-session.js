@@ -10,9 +10,13 @@ const STATES = {
 };
 
 class CallSession {
-  constructor(ws, config, xfConfig = {}) {
+  constructor(ws, config, xfConfig = {}, apiConfig = {}) {
     this.ws = ws;
-    this.config = config;
+    this.config = config || {
+      baseUrl: apiConfig.baseUrl || 'https://api.deepseek.com',
+      apiKey: apiConfig.apiKey || '',
+      model: apiConfig.model || 'deepseek-chat',
+    };
     this.state = STATES.IDLE;
     this.tts = new XunfeiTTS(xfConfig);
     this.asr = new XunfeiASR(
@@ -109,6 +113,7 @@ class CallSession {
     this.latestAsrText = '';
 
     if (text) {
+      console.log(`[用户] ${text}`);
       this.messages.push({ role: 'user', content: text });
       this.processUserInput(text);
     } else {
@@ -120,7 +125,6 @@ class CallSession {
 
   onAsrText(text, isPartial) {
     if (isPartial) {
-      // 增量结果，暂存
       this.latestAsrText = text;
     } else {
       this.asrTextBuffer += text;
@@ -158,6 +162,7 @@ class CallSession {
 
     try {
       const reply = await this.callLLM(text);
+      console.log(`[AI] ${reply}`);
 
       if (!this.llmStreaming || this.state !== STATES.CONNECTED) return;
 
