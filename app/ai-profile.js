@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useCallback } from 'react';
 import { saveSetting, loadSetting } from '../src/services/settings';
 import { copyToAppStorage } from '../src/services/media';
+import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -43,6 +44,8 @@ export default function AIProfileScreen() {
       const tempUri = result.assets[0].uri;
       const permanentUri = await copyToAppStorage(tempUri, 'covers');
       const newCover = permanentUri || tempUri;
+      const oldCover = coverBg || ai.coverBg;
+      if (oldCover) { try { await FileSystem.deleteAsync(oldCover, { idempotent: true }); } catch (e) {} }
       setCoverBg(newCover);
       await saveSetting(`ai_cover_${ai.id}`, newCover);
       await updateAICharacter(ai.id, { coverBg: newCover });

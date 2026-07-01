@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { copyToAppStorage } from '../src/services/media';
+import * as FileSystem from 'expo-file-system';
 import { executeQuery } from '../src/database';
 
 export default function GroupSettingsScreen() {
@@ -48,6 +49,7 @@ export default function GroupSettingsScreen() {
     if (!result.canceled) {
       const tempUri = result.assets[0].uri;
       const permanentUri = await copyToAppStorage(tempUri, 'avatars');
+      if (groupAvatar) { try { await FileSystem.deleteAsync(groupAvatar, { idempotent: true }); } catch (e) {} }
       setGroupAvatar(permanentUri || tempUri);
     }
   };
@@ -56,6 +58,11 @@ export default function GroupSettingsScreen() {
     if (!groupName.trim()) {
       Alert.alert('提示', '请输入群聊名称');
       return;
+    }
+    const oldConv = await executeQuery('SELECT avatar FROM conversations WHERE id = ?', [parseInt(id)]);
+    const oldAvatar = oldConv[0]?.avatar;
+    if (oldAvatar && oldAvatar.length > 1 && oldAvatar !== groupAvatar) {
+      try { await FileSystem.deleteAsync(oldAvatar, { idempotent: true }); } catch (e) {}
     }
     await updateConversation(parseInt(id), {
       name: groupName.trim(),

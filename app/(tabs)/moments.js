@@ -8,6 +8,7 @@ import { aiCommentOnMoment } from '../../src/services/ai';
 import { formatDateTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 import { loadSetting } from '../../src/services/settings';
+import { copyToAppStorage } from '../../src/services/media';
 import * as ImagePicker from 'expo-image-picker';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -107,7 +108,16 @@ export default function MomentsScreen() {
 
   const handlePost = async () => {
     if (!newMoment.trim() && selectedImages.length === 0) { Alert.alert('提示', '请输入内容或选择图片'); return; }
-    await addMoment('user', 1, newMoment.trim(), selectedImages);
+    const permanentImages = [];
+    for (const uri of selectedImages) {
+      if (uri.startsWith('file:///') && !uri.includes('/documents/')) {
+        const dest = await copyToAppStorage(uri, 'moments');
+        if (dest) permanentImages.push(dest); else permanentImages.push(uri);
+      } else {
+        permanentImages.push(uri);
+      }
+    }
+    await addMoment('user', 1, newMoment.trim(), permanentImages);
     setNewMoment(''); setSelectedImages([]); setModalVisible(false);
     setTimeout(async () => {
       await loadMoments();

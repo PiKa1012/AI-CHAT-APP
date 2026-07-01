@@ -1,11 +1,13 @@
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, Alert, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as FileSystem from 'expo-file-system';
 import { useAppStore } from '../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAvatar } from '../src/components/SafeImage';
 import { copyToAppStorage } from '../src/services/media';
+import { executeQuery } from '../src/database';
 
 const PERSONALITIES = ['友好', '可爱', '高冷', '幽默', '温柔', '傲娇', '元气', '成熟'];
 const VOICES = ['默认', '甜美', '磁性', '可爱', '成熟'];
@@ -48,8 +50,11 @@ export default function AIManageScreen() {
       const tempUri = result.assets[0].uri;
       const permanentUri = await copyToAppStorage(tempUri, 'avatars');
       const finalUri = permanentUri || tempUri;
-      
+
       if (isEdit) {
+        if (editingAI.avatar && editingAI.avatar.length > 1) {
+          try { await FileSystem.deleteAsync(editingAI.avatar, { idempotent: true }); } catch (e) {}
+        }
         setEditingAI({ ...editingAI, avatar: finalUri });
       } else {
         setNewAI({ ...newAI, avatar: finalUri });
@@ -88,6 +93,12 @@ export default function AIManageScreen() {
     if (!editingAI.name.trim()) {
       Alert.alert('提示', '请输入AI名称');
       return;
+    }
+    const oldChars = await executeQuery('SELECT avatar FROM ai_characters WHERE id = ?', [editingAI.id]);
+    const oldAvatar = oldChars[0]?.avatar;
+    const newAvatar = editingAI.avatar || editingAI.name[0];
+    if (oldAvatar && oldAvatar.length > 1 && oldAvatar !== newAvatar) {
+      try { await FileSystem.deleteAsync(oldAvatar, { idempotent: true }); } catch (e) {}
     }
     await updateAICharacter(editingAI.id, {
       name: editingAI.name,

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { saveSetting, loadSetting } from '../src/services/settings';
 import * as ImagePicker from 'expo-image-picker';
 import { copyToAppStorage } from '../src/services/media';
+import * as FileSystem from 'expo-file-system';
 
 const DEFAULT_BACKGROUNDS = [
   { id: 'default', color: '#f5f5f5', name: '默认' },
@@ -64,6 +65,7 @@ export default function ChatBackgroundScreen() {
 
     if (!result.canceled) {
       const tempUri = result.assets[0].uri;
+      if (customImage) { try { await FileSystem.deleteAsync(customImage, { idempotent: true }); } catch (e) {} }
       const permanentUri = await copyToAppStorage(tempUri, 'backgrounds');
       saveBackground('custom', permanentUri || tempUri);
     }

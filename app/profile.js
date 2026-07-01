@@ -5,6 +5,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { saveSetting, loadSetting } from '../src/services/settings';
 import * as ImagePicker from 'expo-image-picker';
 import { copyToAppStorage } from '../src/services/media';
+import * as FileSystem from 'expo-file-system';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const COVER_HEIGHT = 260;
@@ -85,6 +86,7 @@ export default function ProfileScreen() {
       const tempUri = result.assets[0].uri;
       const permanentUri = await copyToAppStorage(tempUri, 'avatars');
       const newAvatar = permanentUri || tempUri;
+      if (userAvatar) { try { await FileSystem.deleteAsync(userAvatar, { idempotent: true }); } catch (e) {} }
       setUserAvatar(newAvatar);
       const current = await loadSetting('user_profile', {});
       await saveSetting('user_profile', { ...current, avatar: newAvatar });
@@ -102,6 +104,7 @@ export default function ProfileScreen() {
       const tempUri = result.assets[0].uri;
       const permanentUri = await copyToAppStorage(tempUri, 'covers');
       const newCover = permanentUri || tempUri;
+      if (coverBg) { try { await FileSystem.deleteAsync(coverBg, { idempotent: true }); } catch (e) {} }
       setCoverBg(newCover);
       const current = await loadSetting('user_profile', {});
       await saveSetting('user_profile', { ...current, coverBg: newCover });
