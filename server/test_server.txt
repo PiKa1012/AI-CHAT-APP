@@ -1,0 +1,2 @@
+[语音WS] WebSocket 服务已启动 (ws://host:port/voice)
+桥接服务器已启动，端口 3001

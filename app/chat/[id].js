@@ -1,6 +1,6 @@
 import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { styles } from '../../src/components/chat/styles';
-import { useLocalSearchParams, useRouter, useFocusEffect, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, useNavigation, router } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { getAIResponse, getGroupAIResponse, findMentionedAI, analyzeImage, aiAutoPostMoment } from '../../src/services/ai';
 import { generateDiary } from '../../src/services/diary';
@@ -28,7 +28,6 @@ import { executeQuery } from '../../src/database';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams();
-  const router = useRouter();
   const navigation = useNavigation();
   const messages = useAppStore(s => s.messages);
   const loadMessages = useAppStore(s => s.loadMessages);
@@ -66,6 +65,23 @@ export default function ChatScreen() {
   const lastContentHeight = useRef(0);
 
   const conversation = conversations.find(c => c.id === parseInt(id));
+  const [voiceCallEnabled, setVoiceCallEnabled] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const settings = await loadSetting('api_settings', {});
+      console.log('[电话] 加载设置:', settings.enableVoiceCall);
+      setVoiceCallEnabled(settings.enableVoiceCall || false);
+    })();
+  }, []);
+
+  useLayoutEffect(() => {
+    if (conversation) {
+      navigation.setOptions({
+        title: conversation.name || '聊天',
+      });
+    }
+  }, [conversation, navigation]);
 
   useLayoutEffect(() => {
     if (conversation) {
@@ -902,6 +918,22 @@ export default function ChatScreen() {
               </View>
               <Text style={styles.moreMenuText}>搜音乐</Text>
             </TouchableOpacity>
+            {voiceCallEnabled && conversation?.type !== 'group' && (
+              <TouchableOpacity
+                style={styles.moreMenuItem}
+                onPress={() => {
+                  setShowMoreMenu(false);
+                  router.push({
+                    pathname: `/voice-call/${id}`,
+                  });
+                }}
+              >
+                <View style={[styles.moreMenuIcon, { backgroundColor: '#4fc3f715' }]}>
+                  <Ionicons name="call-outline" size={22} color="#4fc3f7" />
+                </View>
+                <Text style={styles.moreMenuText}>语音通话</Text>
+              </TouchableOpacity>
+            )}
             {conversation?.type === 'group' && (
               <>
                 <TouchableOpacity

@@ -98,7 +98,15 @@ export default function APISettingsScreen() {
   const [amapApiKey, setAmapApiKey] = useState('');
   const [isTestingAmap, setIsTestingAmap] = useState(false);
 
+  // Voice call settings
+  const [enableVoiceCall, setEnableVoiceCall] = useState(false);
+  const [xfAppId, setXfAppId] = useState('');
+  const [xfApiKey, setXfApiKey] = useState('');
+  const [xfApiSecret, setXfApiSecret] = useState('');
+  const [voiceServerUrl, setVoiceServerUrl] = useState('');
+
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingVoice, setIsTestingVoice] = useState(false);
   const [isTestingVision, setIsTestingVision] = useState(false);
   const [isTestingTTS, setIsTestingTTS] = useState(false);
   const [isTestingImageGen, setIsTestingImageGen] = useState(false);
@@ -140,6 +148,11 @@ export default function APISettingsScreen() {
         setEnableMusic(data.enableMusic !== false);
         setAmapApiKey(data.amapApiKey || '');
         setEnableMap(data.enableMap !== false);
+        setEnableVoiceCall(data.enableVoiceCall || false);
+        setXfAppId(data.xfAppId || '');
+        setXfApiKey(data.xfApiKey || '');
+        setXfApiSecret(data.xfApiSecret || '');
+        setVoiceServerUrl(data.voiceServerUrl || '');
       }
     } catch (e) {}
   };
@@ -188,6 +201,31 @@ export default function APISettingsScreen() {
     setIsTestingAmap(false);
   };
 
+  const testVoiceConnection = async () => {
+    if (!voiceServerUrl) {
+      Alert.alert('提示', '请先输入服务器地址');
+      return;
+    }
+    if (!xfAppId || !xfApiKey || !xfApiSecret) {
+      Alert.alert('提示', '请先填写完整的讯飞 ASR 凭据');
+      return;
+    }
+    setIsTestingVoice(true);
+    try {
+      // 测试服务器 WebSocket 是否可达
+      const ws = new WebSocket(voiceServerUrl);
+      await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error('连接超时')), 5000);
+        ws.onopen = () => { clearTimeout(t); ws.close(); resolve(); };
+        ws.onerror = () => { clearTimeout(t); reject(new Error('无法连接')); };
+      });
+      Alert.alert('成功', '服务器连接正常（仅测试 WebSocket 可达，讯飞 ASR 需拨打电话时验证）');
+    } catch (e) {
+      Alert.alert('失败', `连接错误: ${e.message}`);
+    }
+    setIsTestingVoice(false);
+  };
+
   const saveSettings = async () => {
     try {
       await saveSetting('api_settings', {
@@ -219,6 +257,11 @@ export default function APISettingsScreen() {
         enableMusic,
         amapApiKey,
         enableMap,
+        enableVoiceCall,
+        xfAppId,
+        xfApiKey,
+        xfApiSecret,
+        voiceServerUrl,
       });
       clearAPISettingsCache();
       Alert.alert('成功', '设置已保存');
@@ -712,7 +755,6 @@ export default function APISettingsScreen() {
       <View style={styles.section}>
         <View style={styles.switchRow}>
           <View style={styles.switchInfo}>
-            <Ionicons name="musical-notes" size={20} color="#E6A23C" />
             <Text style={styles.switchLabel}>🎵 网易云音乐</Text>
             <Text style={styles.switchDesc}>聊天搜歌播放</Text>
           </View>
@@ -740,7 +782,6 @@ export default function APISettingsScreen() {
       <View style={styles.section}>
         <View style={styles.switchRow}>
           <View style={styles.switchInfo}>
-            <Ionicons name="map" size={20} color="#4A90D9" />
             <Text style={styles.switchLabel}>🗺️ 高德地图</Text>
             <Text style={styles.switchDesc}>位置天气路线查询</Text>
           </View>
@@ -768,6 +809,59 @@ export default function APISettingsScreen() {
         <Text style={styles.featureItem}>🗺️ 路线规划：<Text style={styles.exampleText}>"从王府井到故宫怎么走"</Text></Text>
         <Text style={styles.featureItem}>🗺️ 天气查询：<Text style={styles.exampleText}>"今天天气怎么样"</Text></Text>
         <Text style={styles.featureItem}>🗺️ 位置定位：<Text style={styles.exampleText}>"我现在在哪"</Text></Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.switchRow}>
+          <View style={styles.switchInfo}>
+            <Text style={styles.switchLabel}>📞 语音通话</Text>
+            <Text style={styles.switchDesc}>拨打电话式AI对话</Text>
+          </View>
+          <Switch value={enableVoiceCall} onValueChange={setEnableVoiceCall} trackColor={{ true: '#4fc3f7' }} />
+        </View>
+        {enableVoiceCall && (
+          <View style={styles.subSection}>
+            <Text style={styles.label}>讯飞ASR App ID</Text>
+            <TextInput
+              style={styles.input}
+              value={xfAppId}
+              onChangeText={setXfAppId}
+              placeholder="去 https://www.xfyun.cn/service/voicedictation 注册"
+              placeholderTextColor="#999"
+            />
+            <Text style={styles.label}>讯飞ASR API Key</Text>
+            <TextInput
+              style={styles.input}
+              value={xfApiKey}
+              onChangeText={setXfApiKey}
+              placeholder="讯飞 API Key"
+              placeholderTextColor="#999"
+              secureTextEntry
+            />
+            <Text style={styles.label}>讯飞ASR API Secret</Text>
+            <TextInput
+              style={styles.input}
+              value={xfApiSecret}
+              onChangeText={setXfApiSecret}
+              placeholder="讯飞 API Secret"
+              placeholderTextColor="#999"
+              secureTextEntry
+            />
+            <Text style={styles.label}>服务器地址</Text>
+            <TextInput
+              style={styles.input}
+              value={voiceServerUrl}
+              onChangeText={setVoiceServerUrl}
+              placeholder="ws://你的服务器IP:3001/voice"
+              placeholderTextColor="#999"
+            />
+            <Text style={styles.hint}>运行 bridge 服务的服务器地址，端口 3001</Text>
+
+            <TouchableOpacity style={styles.testSmallButton} onPress={testVoiceConnection} disabled={isTestingVoice}>
+              <Text style={styles.testSmallButtonText}>{isTestingVoice ? '测试中...' : '测试连接'}</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>

@@ -1,10 +1,11 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 
-const GITHUB_REPO = 'PiKa1012/AI-CHAT-APP'; // 改仓库名时记得同步更新这里
+const GITHUB_REPO = 'PiKa1012/AI-CHAT-APP';
 const APP_VERSION = Constants.expoConfig?.version || '1.0.0';
+const APP_NAME = Constants.expoConfig?.name || '恋语';
 
 export default function AboutScreen() {
   const router = useRouter();
@@ -53,49 +54,75 @@ export default function AboutScreen() {
     }
   };
 
-  const InfoRow = ({ label, value }) => (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
-  );
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="heart-circle" size={72} color="#FF6B81" />
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.headerCard}>
+        <View style={styles.iconWrapper}>
+          <Image source={require('../assets/icon.png')} style={styles.appIcon} />
         </View>
-        <Text style={styles.appName}>AI陪伴</Text>
+        <Text style={styles.appName}>{APP_NAME}</Text>
         <Text style={styles.tagline}>一个 AI 社交陪伴应用</Text>
+
+        <View style={styles.badgeRow}>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>v{APP_VERSION}</Text>
+          </View>
+        </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>版本信息</Text>
-        <InfoRow label="版本号" value={`v${APP_VERSION}`} />
-        <InfoRow label="构建版本" value={`${Constants.expoConfig?.android?.versionCode || '1'}`} />
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="information-circle" size={18} color="#4A90D9" />
+          <Text style={styles.cardTitle}>版本信息</Text>
+        </View>
+        <View style={styles.cardBody}>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>版本号</Text>
+            <Text style={styles.infoValue}>v{APP_VERSION}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>构建版本</Text>
+            <Text style={styles.infoValue}>{Constants.expoConfig?.android?.versionCode || '1'}</Text>
+          </View>
+        </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>作者</Text>
-        <InfoRow label="开发者" value="PiKa1012" />
-        <TouchableOpacity
-          style={styles.linkItem}
-          onPress={() => Linking.openURL(`https://github.com/${GITHUB_REPO}`)}
-        >
-          <Ionicons name="logo-github" size={20} color="#333" />
-          <Text style={styles.linkText}>GitHub 仓库</Text>
-          <Ionicons name="open-outline" size={16} color="#999" />
-        </TouchableOpacity>
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="person" size={18} color="#4A90D9" />
+          <Text style={styles.cardTitle}>开发者</Text>
+        </View>
+        <View style={styles.cardBody}>
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => Linking.openURL(`https://github.com/${GITHUB_REPO}`)}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="code-slash" size={20} color="#333" />
+            <Text style={styles.linkLabel}>PiKa1012</Text>
+            <Ionicons name="open-outline" size={16} color="#999" />
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.linkRow}
+            onPress={() => Linking.openURL(`https://github.com/${GITHUB_REPO}`)}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="logo-github" size={20} color="#333" />
+            <Text style={styles.linkLabel}>GitHub 仓库</Text>
+            <Ionicons name="open-outline" size={16} color="#999" />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <TouchableOpacity style={styles.updateButton} onPress={checkForUpdates}>
+      <TouchableOpacity style={styles.updateButton} onPress={checkForUpdates} activeOpacity={0.8}>
         <Ionicons name="refresh" size={20} color="#fff" />
         <Text style={styles.updateButtonText}>检查更新</Text>
       </TouchableOpacity>
 
       <Text style={styles.footer}>
-        © {new Date().getFullYear()} PiKa1012. All rights reserved.
+        © {new Date().getFullYear()} PiKa1012
       </Text>
     </ScrollView>
   );
@@ -116,53 +143,98 @@ function compareVersions(v1, v2) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 40,
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  headerCard: {
     backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 32,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FFF0F3',
+  iconWrapper: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#EBF2FC',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
   appName: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#333',
+    color: '#1a1a1a',
     marginBottom: 4,
+  },
+  appIcon: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 44,
   },
   tagline: {
     fontSize: 14,
     color: '#999',
+    marginBottom: 12,
   },
-  section: {
-    backgroundColor: '#fff',
-    marginTop: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  sectionTitle: {
+  badge: {
+    backgroundColor: '#EBF2FC',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
     fontSize: 13,
-    color: '#999',
-    padding: 12,
+    color: '#4A90D9',
+    fontWeight: '600',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  cardBody: {
+    paddingHorizontal: 16,
     paddingBottom: 4,
   },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 14,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   infoLabel: {
     fontSize: 15,
@@ -172,13 +244,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666',
   },
-  linkItem: {
+  divider: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+  },
+  linkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 8,
+    paddingVertical: 12,
+    gap: 10,
   },
-  linkText: {
+  linkLabel: {
     fontSize: 15,
     color: '#333',
     flex: 1,
@@ -188,11 +264,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4A90D9',
-    marginHorizontal: 20,
-    marginTop: 24,
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     gap: 8,
+    marginTop: 4,
+    shadowColor: '#4A90D9',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   updateButtonText: {
     color: '#fff',
@@ -201,9 +281,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     textAlign: 'center',
-    color: '#ccc',
+    color: '#bbb',
     fontSize: 12,
-    marginTop: 32,
-    marginBottom: 40,
+    marginTop: 28,
   },
 });
