@@ -10,3 +10,6 @@ dist/
 web-build/
 .DS_Store
 *.tsbuildinfo
+
+# ²âÊÔÁÙÊ±ÎÄ¼ş
+server/test_*.txt
