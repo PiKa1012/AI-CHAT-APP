@@ -458,9 +458,17 @@ export default function ChatScreen() {
           d.setHours(d.getHours() + 8);
           return d.toISOString().slice(0, 10) === todayStr;
         });
-        const content = await aiAutoPostMoment(aiId, messageText, todayMessages);
+        const result = await aiAutoPostMoment(aiId, messageText, todayMessages);
         const ai = aiCharacters.find(a => a.id === aiId);
-        await sendMessage(parseInt(id), 'ai', aiId, `发了条朋友圈~${content ? '\n\n' + content : ''}`);
+        const fallbacks = [
+          '发了条朋友圈~',
+          '去朋友圈看看吧，刚发的~',
+          '发了一条新动态~',
+          '发朋友圈啦，去看看~',
+          '刚发了一条朋友圈，快来点赞~',
+          '发朋友圈了，快来瞧瞧~',
+        ];
+        await sendMessage(parseInt(id), 'ai', aiId, result?.reply || fallbacks[Math.floor(Math.random() * fallbacks.length)]);
       } catch (error) {
         await sendMessage(parseInt(id), 'ai', aiId, `发朋友圈失败了：${error.message}`);
       }

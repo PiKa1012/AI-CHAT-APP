@@ -17,7 +17,7 @@ function createVoiceWSServer(httpServer, getConfig) {
             if (session) {
               session.hangup();
             }
-            session = new CallSession(ws, getConfig(), msg.xfConfig || {}, msg.apiConfig || {});
+            session = new CallSession(ws, getConfig(), msg.xfConfig || {}, msg.apiConfig || {}, msg.charInfo || null);
             session.start(msg.characterId);
             break;
 

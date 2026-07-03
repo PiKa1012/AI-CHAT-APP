@@ -182,7 +182,7 @@ export default function WechatConnectScreen() {
             style={[styles.input, { flex: 1 }]}
             value={serverUrl}
             onChangeText={setServerUrl}
-            placeholder="http://你的服务器IP:3001"
+              placeholder="http://你的服务器IP:3001"
             placeholderTextColor="#999"
             autoCapitalize="none"
             autoCorrect={false}

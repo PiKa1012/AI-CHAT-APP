@@ -61,6 +61,11 @@ export class VoiceCallService {
       this.aiConfig = { baseUrl: 'https://api.deepseek.com', apiKey: '', model: 'deepseek-chat' };
     }
 
+    // 从数据库加载 AI 角色信息
+    if (callbacks.charInfo) {
+      this.charInfo = callbacks.charInfo;
+    }
+
     if (!this.wsUrl) {
       this.onError?.('请在 API 设置中配置语音通话服务器地址');
       return;
@@ -91,6 +96,7 @@ export class VoiceCallService {
         characterId,
         xfConfig: this.xfConfig,
         apiConfig: this.aiConfig,
+        charInfo: this.charInfo || null,
       }));
       this.startRecordingLoop();
     };

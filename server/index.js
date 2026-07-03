@@ -238,8 +238,7 @@ async function callAI(text) {
 app.get('/api/bridge/status', (req, res) => {
   res.json({
     status: bridgeState.status,
-    qrCode: bridgeState.qrCode,
-    error: bridgeState.error,
+    message: bridgeState.status === 'error' ? bridgeState.error : '',
   });
 });
 

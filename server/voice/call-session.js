@@ -10,8 +10,9 @@ const STATES = {
 };
 
 class CallSession {
-  constructor(ws, config, xfConfig = {}, apiConfig = {}) {
+  constructor(ws, config, xfConfig = {}, apiConfig = {}, charInfo = null) {
     this.ws = ws;
+    this.charInfo = charInfo;
     this.config = config || {
       baseUrl: apiConfig.baseUrl || 'https://api.deepseek.com',
       apiKey: apiConfig.apiKey || '',
@@ -31,10 +32,36 @@ class CallSession {
     this.interrupting = false;
     this.asrTextBuffer = '';
     this.latestAsrText = '';
+    this.processing = false;
     this.sessionId = crypto.randomUUID();
 
     // 角色设定
-    this.characterPrompt = '你是一个友善的AI伙伴。正在和用户进行语音通话，请用口语化的方式回应，简短自然。回答不要太长。';
+    if (this.charInfo) {
+      const parts = [];
+      // AI 角色信息
+      const aiParts = [];
+      if (this.charInfo.name) aiParts.push(`你是${this.charInfo.name}`);
+      if (this.charInfo.age) aiParts.push(`${this.charInfo.age}岁`);
+      if (this.charInfo.gender) aiParts.push(this.charInfo.gender);
+      if (this.charInfo.personality) aiParts.push(`性格${this.charInfo.personality}`);
+      if (this.charInfo.background) aiParts.push(`背景：${this.charInfo.background}`);
+      if (this.charInfo.speaking_style) aiParts.push(`说话风格：${this.charInfo.speaking_style}`);
+      if (this.charInfo.likes) aiParts.push(`喜好：${this.charInfo.likes}`);
+      if (this.charInfo.relationship) aiParts.push(`与用户的关系：${this.charInfo.relationship}`);
+      if (aiParts.length > 0) parts.push(aiParts.join('，'));
+
+      // 用户信息
+      const userParts = [];
+      if (this.charInfo.userName) userParts.push(`用户在跟你通话，名字是${this.charInfo.userName}`);
+      if (this.charInfo.userGender) userParts.push(`性别${this.charInfo.userGender}`);
+      if (this.charInfo.userAge) userParts.push(`${this.charInfo.userAge}岁`);
+      if (userParts.length > 0) parts.push(userParts.join('，'));
+
+      parts.push('正在语音通话，每次只回复一句话，不超过30字，口语化自然');
+      this.characterPrompt = parts.join('。');
+    if (!this.characterPrompt) {
+      this.characterPrompt = '你是一个友善的AI伙伴。正在和用户进行语音通话，每次只回复一句话，不超过30个字，口语化，自然简短。';
+    }
   }
 
   async start(characterId) {
@@ -50,9 +77,12 @@ class CallSession {
     this.send({ type: 'connected' });
 
     // 初始问候
+    this.processing = true;
     this.llmStreaming = true;
-    await this.speak('喂你好，我是你的AI伙伴，现在可以开始聊天了。');
+    const greeting = this.charInfo?.name ? `喂你好，我是${this.charInfo.name}，现在可以开始聊天了。` : '喂你好，我是你的AI伙伴，现在可以开始聊天了。';
+    await this.speak(greeting);
     this.llmStreaming = false;
+    this.processing = false;
     this.listen();
   }
 
@@ -60,6 +90,7 @@ class CallSession {
 
   onAudio(data) {
     if (this.state !== STATES.CONNECTED) return;
+    if (this.processing) return;
 
     // 检测是否有声音 (简单音量检测)
     const isSilent = this.isSilent(data);
@@ -159,14 +190,13 @@ class CallSession {
 
   async processUserInput(text) {
     this.llmStreaming = true;
+    this.processing = true;
 
     try {
       const reply = await this.callLLM(text);
       console.log(`[AI] ${reply}`);
 
       if (!this.llmStreaming || this.state !== STATES.CONNECTED) return;
-
-      await this.speak(reply);
 
       this.messages.push({ role: 'assistant', content: reply });
     } catch (err) {
@@ -176,6 +206,7 @@ class CallSession {
       }
     } finally {
       this.llmStreaming = false;
+      this.processing = false;
       if (this.state === STATES.CONNECTED) this.listen();
     }
   }
@@ -188,61 +219,78 @@ class CallSession {
       { role: 'user', content: text },
     ];
 
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: model || 'deepseek-chat',
-        messages,
-        max_tokens: 512,
-        temperature: 0.7,
-        stream: true,
-      }),
+    const cleanBaseUrl = (baseUrl || '').replace(/\/+$/, '');
+    const url = `${cleanBaseUrl}/v1/chat/completions`;
+    console.log(`[LLM] URL: ${url}`);
+    console.log(`[LLM] Model: ${model}, Key长度: ${(apiKey || '').length}, 消息数: ${messages.length}`);
+
+    const body = JSON.stringify({
+      model: model || 'deepseek-chat',
+      messages,
+        max_tokens: 300,
+      temperature: 0.7,
+      stream: true,
     });
 
-    if (!res.ok) throw new Error(`LLM ${res.status}: ${await res.text()}`);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body,
+    });
 
-    // 流式读取 LLM 输出，边读边 TTS
+    console.log(`[LLM] HTTP ${res.status}, OK: ${res.ok}, Content-Type: ${res.headers.get('content-type')}`);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error(`[LLM] 错误: ${errText.slice(0, 500)}`);
+      throw new Error(`LLM ${res.status}`);
+    }
+
     let fullText = '';
-    let ttsBuffer = '';
+    let chunkCount = 0;
+    let lineCount = 0;
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
 
     while (this.llmStreaming) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) { console.log(`[LLM] 流结束, ${chunkCount}块 ${lineCount}行, ${fullText.length}字`); break; }
 
+      chunkCount++;
       const chunk = decoder.decode(value, { stream: true });
       const lines = chunk.split('\n').filter((l) => l.startsWith('data: '));
+      if (chunkCount === 1) { console.log(`[LLM] 首块 ${value.length}B, data行: ${lines.length}`); }
 
       for (const line of lines) {
+        lineCount++;
         const data = line.slice(6);
-        if (data === '[DONE]') continue;
+        if (data === '[DONE]') { console.log('[LLM] [DONE]'); continue; }
         try {
           const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta?.content || '';
+          const delta = parsed.choices?.[0]?.delta?.content
+            || parsed.choices?.[0]?.delta?.reasoning_content
+            || '';
           fullText += delta;
-          ttsBuffer += delta;
-
-          // 遇到标点符号触发 TTS
-          if (/[。！？，.\n!?,]/.test(delta) && ttsBuffer.length > 3) {
-            if (this.tts.speaking) continue;
-            await this.speak(ttsBuffer);
-            ttsBuffer = '';
-          }
-        } catch {}
+        } catch (e) {}
       }
     }
 
-    if (ttsBuffer.trim() && this.llmStreaming) {
-      await this.speak(ttsBuffer);
+    // 去掉思考过程，只保留真正的回复
+    console.log(`[LLM思考] ${fullText.slice(0, 300)}`);
+    let reply = fullText
+      .replace(/（[^）]*）/g, '')   // 闭合的括号内容
+      .replace(/（[^）]*/g, '')     // 未闭合的括号（截断的思考）
+      .replace(/[）]/g, '')          // 残留的右括号
+      .replace(/。/g, '。')
+      .trim();
+
+    console.log(`[LLM] 最终回复: "${reply.slice(0, 100)}"`);
+    if (reply) {
+      await this.speak(reply);
     }
 
-    return fullText;
+    return reply;
   }
 
   async speak(text) {

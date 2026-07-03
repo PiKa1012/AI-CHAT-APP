@@ -2,6 +2,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useAppStore } from '../../src/stores';
 import { executeQuery } from '../../src/database';
+import { loadSetting } from '../../src/services/settings';
 import { VoiceCallService } from '../../src/services/voice-call';
 import { SafeAvatar } from '../../src/components/SafeImage';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +15,7 @@ export default function VoiceCallScreen() {
 
   const [charName, setCharName] = useState('');
   const [charAvatar, setCharAvatar] = useState('');
+  const charInfoRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
   const [state, setState] = useState('idle');
   const [duration, setDuration] = useState(0);
@@ -43,6 +45,7 @@ export default function VoiceCallScreen() {
         onError: (msg) => {
           setErrorMsg(msg);
         },
+        charInfo: charInfoRef.current,
       });
     } catch (e) {
       setErrorMsg('加载失败: ' + e.message);
@@ -63,6 +66,16 @@ export default function VoiceCallScreen() {
             setCharName(char.name || 'AI伙伴');
             const rawAvatar = char.avatar || '';
             setCharAvatar(rawAvatar.length > 1 ? rawAvatar : '');
+            charInfoRef.current = {
+              name: char.name || 'AI伙伴',
+              personality: char.personality || '',
+              background: char.background || '',
+              age: char.age || '',
+              gender: char.gender || '',
+              likes: char.likes || '',
+              speaking_style: char.speaking_style || '',
+              relationship: char.relationship || '',
+            };
           } else {
             setCharName('AI伙伴');
           }
@@ -72,6 +85,14 @@ export default function VoiceCallScreen() {
       } catch (e) {
         console.error('[通话] 加载角色失败:', e);
       }
+
+      const userProfile = await loadSetting('user_profile', {});
+      charInfoRef.current = {
+        ...(charInfoRef.current || {}),
+        userName: userProfile.name || '',
+        userGender: userProfile.gender || '',
+        userAge: userProfile.age || '',
+      };
       setLoaded(true);
     })();
     return () => {
