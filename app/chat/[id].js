@@ -149,6 +149,7 @@ export default function ChatScreen() {
         loadChatBackground();
         loadConversations();
         loadUserProfile();
+        loadEmojiPacks();
       }
     }, [id])
   );
