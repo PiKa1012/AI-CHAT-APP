@@ -6,14 +6,11 @@ function padZero(num) {
 
 function parseToUTC(dateStr) {
   if (!dateStr) return new Date();
-  
   if (typeof dateStr === 'string') {
-    if (dateStr.includes('T') || dateStr.includes('Z')) {
+    if (dateStr.includes('Z') || dateStr.includes('+') || dateStr.includes('T')) {
       return new Date(dateStr);
-    } else {
-      const d = new Date(dateStr.replace(' ', 'T'));
-      return isNaN(d.getTime()) ? new Date() : d;
     }
+    return new Date(dateStr.replace(' ', 'T') + 'Z');
   }
   return new Date(dateStr);
 }

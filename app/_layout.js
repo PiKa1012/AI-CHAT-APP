@@ -69,7 +69,11 @@ export default function RootLayout() {
           }} 
         />
         <Stack.Screen name="ai-manage" options={{ title: 'AI管理' }} />
-        <Stack.Screen name="api-settings" options={{ title: 'API设置' }} />
+        <Stack.Screen name="api-settings/index" options={{ title: 'API 设置' }} />
+        <Stack.Screen name="api-settings/model" options={{ title: 'AI 模型' }} />
+        <Stack.Screen name="api-settings/features" options={{ title: 'AI 功能' }} />
+        <Stack.Screen name="api-settings/voice" options={{ title: '语音' }} />
+        <Stack.Screen name="api-settings/services" options={{ title: '第三方服务' }} />
         <Stack.Screen name="scheduled-tasks" options={{ title: '定时任务' }} />
         <Stack.Screen name="emoji-manage" options={{ title: '表情包管理' }} />
         <Stack.Screen name="profile" options={{ title: '我的资料' }} />

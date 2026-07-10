@@ -475,7 +475,20 @@ export default function ChatScreen() {
       setIsTyping(false);
       return;
     }
-    
+
+    if (messageText.match(/写.*日记|日记/) && aiId) {
+      setIsTyping(true);
+      try {
+        await generateDiary(aiId);
+        const ai = aiCharacters.find(a => a.id === aiId);
+        await sendMessage(parseInt(id), 'ai', aiId, '写好今天的日记啦，去日记页看看吧~');
+      } catch (error) {
+        await sendMessage(parseInt(id), 'ai', aiId, `写日记失败了：${error.message}`);
+      }
+      setIsTyping(false);
+      return;
+    }
+
     const mapIntent = detectMapIntent(messageText);
     if (mapIntent && settings?.enableMap && settings?.amapApiKey) {
       setIsTyping(true);

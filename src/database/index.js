@@ -146,7 +146,7 @@ async function initDatabase(database) {
       tags TEXT DEFAULT '[]',
       images TEXT DEFAULT '[]',
       is_public INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT (datetime('now', '+8 hours')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (ai_id) REFERENCES ai_characters(id)
     );
@@ -202,6 +202,14 @@ async function initDatabase(database) {
   `);
 
   try { await database.execAsync('ALTER TABLE api_usage ADD COLUMN cached_tokens INTEGER DEFAULT 0'); } catch (e) { /* 列可能已存在，忽略 */ }
+  // 一次性迁移：旧日记 created_at 为北京时间，改为 UTC
+  try {
+    const migrated = await database.getAllAsync("SELECT value FROM user_settings WHERE key = 'diary_tz_migrated'");
+    if (migrated.length === 0) {
+      await database.execAsync("UPDATE diaries SET created_at = datetime(created_at, '-8 hours')");
+      await database.runAsync("INSERT OR IGNORE INTO user_settings (key, value) VALUES ('diary_tz_migrated', '1')");
+    }
+  } catch (e) { /* 迁移过则跳过 */ }
 }
 
 export async function executeQuery(sql, params = []) {

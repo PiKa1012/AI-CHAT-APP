@@ -4,7 +4,7 @@ import { useAppStore } from '../../src/stores';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { formatTime, formatDate } from '../../src/utils/time';
+import { formatTime } from '../../src/utils/time';
 import { SafeAvatar } from '../../src/components/SafeImage';
 import { executeQuery, executeUpdate } from '../../src/database';
 
@@ -21,6 +21,7 @@ export default function HomeScreen() {
   const [aiSelectorVisible, setAiSelectorVisible] = useState(false);
   const [groupSelectorVisible, setGroupSelectorVisible] = useState(false);
   const [selectedAIs, setSelectedAIs] = useState([]);
+  const [fabOpen, setFabOpen] = useState(false);
 
   useFocusEffect(useCallback(() => {
     loadConversations();
@@ -28,9 +29,7 @@ export default function HomeScreen() {
     checkUnreadMessages();
   }, []));
 
-  useEffect(() => {
-    checkUnreadMessages();
-  }, [conversations]);
+  useEffect(() => { checkUnreadMessages(); }, [conversations]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -48,269 +47,187 @@ export default function HomeScreen() {
     setUnreadCounts(counts);
   };
 
-  const handleNewChat = async () => {
-    if (aiCharacters.length === 0) {
-      Alert.alert('提示', '请先创建AI角色');
-      router.push('/ai-manage');
-      return;
-    }
+  const handleNewChat = () => {
+    if (aiCharacters.length === 0) { Alert.alert('提示', '请先创建AI角色'); router.push('/ai-manage'); return; }
     setAiSelectorVisible(true);
+  };
+  const handleNewGroup = () => {
+    if (aiCharacters.length < 2) { Alert.alert('提示', '至少需要2个AI角色才能创建群聊'); return; }
+    setSelectedAIs([]); setGroupSelectorVisible(true);
   };
 
   const startChatWithAI = async (ai) => {
     setAiSelectorVisible(false);
+    const existing = conversations.find(c => c.type === 'private' && c.name === ai.name);
+    if (existing) { router.push(`/chat/${existing.id}`); return; }
     const convId = await createConversation('private', ai.name, [ai.id]);
     router.push(`/chat/${convId}`);
   };
 
-  const handleNewGroup = async () => {
-    if (aiCharacters.length < 2) {
-      Alert.alert('提示', '至少需要2个AI角色才能创建群聊');
-      router.push('/ai-manage');
-      return;
-    }
-    setSelectedAIs([]);
-    setGroupSelectorVisible(true);
-  };
-
   const toggleAISelection = (aiId) => {
-    setSelectedAIs(prev => {
-      if (prev.includes(aiId)) {
-        return prev.filter(id => id !== aiId);
-      }
-      return [...prev, aiId];
-    });
+    setSelectedAIs(prev => prev.includes(aiId) ? prev.filter(id => id !== aiId) : [...prev, aiId]);
   };
 
   const createGroupChat = async () => {
-    if (selectedAIs.length < 2) {
-      Alert.alert('提示', '请至少选择2个AI');
-      return;
-    }
-    const selectedNames = aiCharacters
-      .filter(ai => selectedAIs.includes(ai.id))
-      .map(ai => ai.name)
-      .join('、');
-    const convId = await createConversation('group', `${selectedNames}的群聊`, selectedAIs);
+    if (selectedAIs.length < 2) return Alert.alert('提示', '请至少选择2个AI');
+    const names = aiCharacters.filter(ai => selectedAIs.includes(ai.id)).map(ai => ai.name).join('、');
+    const convId = await createConversation('group', `${names}的群聊`, selectedAIs);
     setGroupSelectorVisible(false);
     router.push(`/chat/${convId}`);
   };
 
   const openConversation = async (conv) => {
-    await executeUpdate(
-      'UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = "ai"',
-      [conv.id]
-    );
+    await executeUpdate('UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = "ai"', [conv.id]);
     setUnreadCounts(prev => ({ ...prev, [conv.id]: 0 }));
     router.push(`/chat/${conv.id}`);
   };
 
   const handleDeleteConversation = (conv) => {
-    Alert.alert(
-      '删除对话',
-      `确定要删除与"${conv.name}"的聊天吗？删除后无法恢复。`,
-      [
-        { text: '取消', style: 'cancel' },
-        { 
-          text: '删除', 
-          style: 'destructive', 
-          onPress: async () => {
-            await deleteConversation(conv.id);
-          }
-        },
-      ]
-    );
+    Alert.alert('删除对话', `确定要删除与"${conv.name}"的聊天吗？`, [
+      { text: '取消', style: 'cancel' },
+      { text: '删除', style: 'destructive', onPress: () => deleteConversation(conv.id) },
+    ]);
   };
 
-  const renderConversation = ({ item }) => {
+  const getConvAvatar = (item) => {
+    if (item.type === 'group') return item.avatar || null;
+    const ai = aiCharacters.find(a => a.name === item.name);
+    return ai?.avatar || null;
+  };
+
+  const getConvColor = (item) => {
+    if (item.type === 'group') return '#67C23A';
+    const cs = ['#4A90D9', '#E6A23C', '#F56C6C', '#9B59B6', '#1ABC9C', '#E74C3C', '#909399'];
+    return cs[item.id % cs.length];
+  };
+
+  const getLastMsg = (item) => {
+    if (item.last_message_type === 'image') return '📷 图片';
+    if (item.last_message_type === 'audio') return '🎤 语音';
+    if (item.last_message_type === 'music_list') {
+      try { const s = JSON.parse(item.last_message || '[]'); return s.length > 0 ? `🎵 ${s[0].name || ''}` : '🎵 音乐'; }
+      catch { return '🎵 音乐'; }
+    }
+    if (item.last_message_type === 'emoji') return '😊 表情';
+    return item.last_message || '暂无消息';
+  };
+
+  const renderConversation = ({ item, index }) => {
     const unreadCount = unreadCounts[item.id] || 0;
     const hasUnread = unreadCount > 0;
-
-    const getConversationAvatar = () => {
-      if (item.type === 'group') {
-        return item.avatar || null;
-      }
-      const ai = aiCharacters.find(a => a.name === item.name);
-      return ai?.avatar || null;
-    };
-
-    const getAvatarColor = () => {
-      if (item.type === 'group') return '#67C23A';
-      const colors = ['#4A90D9', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C'];
-      return colors[item.id % colors.length];
-    };
-
-    const avatar = getConversationAvatar();
+    const color = getConvColor(item);
+    const avatar = getConvAvatar(item);
 
     return (
-      <TouchableOpacity
-        style={styles.conversationItem}
-        onPress={() => openConversation(item)}
-        onLongPress={() => handleDeleteConversation(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.avatarContainer}>
-          <SafeAvatar
-            uri={avatar}
-            size={50}
-            name={item.name || 'A'}
-            color={getAvatarColor()}
-          />
-          {hasUnread && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-            </View>
-          )}
+      <TouchableOpacity style={[s.item, hasUnread && s.itemUnread]} onPress={() => openConversation(item)} onLongPress={() => handleDeleteConversation(item)} activeOpacity={0.7}>
+        <View style={s.avatarWrap}>
+          <SafeAvatar uri={avatar} size={52} name={item.name || 'A'} color={color} />
+          {item.type === 'group' && <View style={[s.groupBadge, { backgroundColor: color }]}><Ionicons name="people" size={10} color="#fff" /></View>}
+          {hasUnread && <View style={s.badge}><Text style={s.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View>}
         </View>
-        <View style={styles.conversationInfo}>
-          <View style={styles.conversationHeader}>
-            <Text style={[styles.conversationName, hasUnread && styles.conversationNameUnread]}>
-              {item.name || '未命名对话'}
-            </Text>
-            <Text style={[styles.conversationTime, hasUnread && styles.conversationTimeUnread]}>
-              {formatTime(item.last_message_time)}
-            </Text>
+        <View style={s.info}>
+          <View style={s.topRow}>
+            <Text style={[s.name, hasUnread && s.nameBold]}>{item.name || '未命名'}</Text>
+            <Text style={[s.time, hasUnread && s.timeNew]}>{formatTime(item.last_message_time)}</Text>
           </View>
-          <Text style={[styles.lastMessage, hasUnread && styles.lastMessageUnread]} numberOfLines={1}>
-            {item.last_message_type === 'image' ? '[图片]' : item.last_message_type === 'music_list' ? (() => { try { const songs = JSON.parse(item.last_message || '[]'); return songs.length > 0 ? `[音乐] ${songs[0].name || ''}` : '[音乐]'; } catch (e) { return '[音乐]'; } })() : item.last_message_type === 'audio' ? '[语音]' : (item.last_message || '暂无消息')}
-          </Text>
+          <View style={s.bottomRow}>
+            <Text style={[s.msg, hasUnread && s.msgBold]} numberOfLines={1}>{getLastMsg(item)}</Text>
+            {item.type === 'group' && <Text style={s.groupTag}>群聊</Text>}
+          </View>
         </View>
       </TouchableOpacity>
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.quickActions}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleNewChat}>
-          <View style={[styles.actionIcon, { backgroundColor: '#4A90D915' }]}>
-            <Ionicons name="chatbubble-ellipses" size={24} color="#4A90D9" />
-          </View>
-          <Text style={styles.actionText}>私聊</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={handleNewGroup}>
-          <View style={[styles.actionIcon, { backgroundColor: '#67C23A15' }]}>
-            <Ionicons name="people" size={24} color="#67C23A" />
-          </View>
-          <Text style={styles.actionText}>群聊</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/ai-manage')}>
-          <View style={[styles.actionIcon, { backgroundColor: '#E6A23C15' }]}>
-            <Ionicons name="person-add" size={24} color="#E6A23C" />
-          </View>
-          <Text style={styles.actionText}>AI管理</Text>
-        </TouchableOpacity>
-      </View>
+  const cs = ['#4A90D9', '#67C23A', '#E6A23C', '#F56C6C', '#9B59B6', '#1ABC9C', '#E74C3C'];
 
+  return (
+    <View style={s.container}>
       <FlatList
         data={conversations}
         renderItem={renderConversation}
         keyExtractor={(item) => item.id.toString()}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        contentContainerStyle={s.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>暂无对话</Text>
-            <Text style={styles.emptySubText}>点击上方按钮开始聊天</Text>
+          <View style={s.empty}>
+            <View style={s.emptyIcon}>
+              <Ionicons name="chatbubbles-outline" size={48} color="#ccc" />
+            </View>
+            <Text style={s.emptyTitle}>暂无对话</Text>
+            <Text style={s.emptySub}>点击上方按钮开始聊天</Text>
           </View>
         }
       />
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={aiSelectorVisible}
-        onRequestClose={() => setAiSelectorVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>选择AI聊天</Text>
-              <TouchableOpacity onPress={() => setAiSelectorVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
+      {fabOpen && <TouchableOpacity style={s.fabOverlay} activeOpacity={1} onPress={() => setFabOpen(false)} />}
+
+      {fabOpen && (
+        <View style={s.fabMenu}>
+          <TouchableOpacity style={s.fabItem} onPress={() => { setFabOpen(false); handleNewChat(); }}>
+            <View style={[s.fabIcon, { backgroundColor: '#4A90D915' }]}><Ionicons name="chatbubble-outline" size={22} color="#4A90D9" /></View>
+            <Text style={s.fabLabel}>私聊</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.fabItem} onPress={() => { setFabOpen(false); handleNewGroup(); }}>
+            <View style={[s.fabIcon, { backgroundColor: '#67C23A15' }]}><Ionicons name="people-outline" size={22} color="#67C23A" /></View>
+            <Text style={s.fabLabel}>群聊</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.fabItem} onPress={() => { setFabOpen(false); router.push('/ai-manage'); }}>
+            <View style={[s.fabIcon, { backgroundColor: '#E6A23C15' }]}><Ionicons name="person-add-outline" size={22} color="#E6A23C" /></View>
+            <Text style={s.fabLabel}>AI管理</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <TouchableOpacity style={[s.fab, fabOpen && s.fabActive]} onPress={() => setFabOpen(!fabOpen)} activeOpacity={0.8}>
+        <Ionicons name={fabOpen ? 'close' : 'add'} size={26} color="#333" />
+      </TouchableOpacity>
+
+      <Modal animationType="slide" transparent visible={aiSelectorVisible} onRequestClose={() => setAiSelectorVisible(false)}>
+        <View style={s.overlay}>
+          <View style={s.sheet}>
+            <View style={s.sheetHead}>
+              <Text style={s.sheetTitle}>选择 AI</Text>
+              <TouchableOpacity onPress={() => setAiSelectorVisible(false)}><Ionicons name="close" size={24} color="#333" /></TouchableOpacity>
             </View>
-            <FlatList
-              data={aiCharacters}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.aiItem}
-                  onPress={() => startChatWithAI(item)}
-                >
-                  <SafeAvatar
-                    uri={item.avatar}
-                    size={44}
-                    name={item.name || 'A'}
-                    color={getAvatarColor(item.id)}
-                  />
-                  <View style={styles.aiInfo}>
-                    <Text style={styles.aiName}>{item.name}</Text>
-                    <Text style={styles.aiPersonality}>{item.personality || '友好'}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#ccc" />
-                </TouchableOpacity>
-              )}
-              contentContainerStyle={styles.aiList}
-            />
+            <FlatList data={aiCharacters} keyExtractor={it => it.id.toString()} renderItem={({ item: ai }) => (
+              <TouchableOpacity style={s.aiRow} onPress={() => startChatWithAI(ai)}>
+                <SafeAvatar uri={ai.avatar} size={44} name={ai.name || 'A'} color={cs[ai.id % cs.length]} />
+                <View style={s.aiInfo}>
+                  <Text style={s.aiName}>{ai.name}</Text>
+                  <Text style={s.aiDesc}>{ai.personality || '友好'}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#ccc" />
+              </TouchableOpacity>
+            )} contentContainerStyle={s.aiList} />
           </View>
         </View>
       </Modal>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={groupSelectorVisible}
-        onRequestClose={() => setGroupSelectorVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>选择群成员</Text>
-              <TouchableOpacity onPress={() => setGroupSelectorVisible(false)}>
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
+      <Modal animationType="slide" transparent visible={groupSelectorVisible} onRequestClose={() => setGroupSelectorVisible(false)}>
+        <View style={s.overlay}>
+          <View style={s.sheet}>
+            <View style={s.sheetHead}>
+              <Text style={s.sheetTitle}>选择群成员</Text>
+              <TouchableOpacity onPress={() => setGroupSelectorVisible(false)}><Ionicons name="close" size={24} color="#333" /></TouchableOpacity>
             </View>
-            <Text style={styles.groupHint}>请至少选择2个AI创建群聊</Text>
-            <FlatList
-              data={aiCharacters}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => {
-                const isSelected = selectedAIs.includes(item.id);
-                return (
-                  <TouchableOpacity
-                    style={[styles.aiItem, isSelected && styles.aiItemSelected]}
-                    onPress={() => toggleAISelection(item.id)}
-                  >
-                    <SafeAvatar
-                      uri={item.avatar}
-                      size={44}
-                      name={item.name || 'A'}
-                      color={getAvatarColor(item.id)}
-                    />
-                    <View style={styles.aiInfo}>
-                      <Text style={styles.aiName}>{item.name}</Text>
-                      <Text style={styles.aiPersonality}>{item.personality || '友好'}</Text>
-                    </View>
-                    <Ionicons 
-                      name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
-                      size={24} 
-                      color={isSelected ? "#4A90D9" : "#ccc"} 
-                    />
-                  </TouchableOpacity>
-                );
-              }}
-              contentContainerStyle={styles.aiList}
-            />
-            <TouchableOpacity 
-              style={[styles.createGroupButton, selectedAIs.length < 2 && styles.createGroupButtonDisabled]}
-              onPress={createGroupChat}
-              disabled={selectedAIs.length < 2}
-            >
-              <Text style={styles.createGroupButtonText}>
-                创建群聊 ({selectedAIs.length}人)
-              </Text>
+            <Text style={s.hint}>请至少选择 2 个 AI 创建群聊</Text>
+            <FlatList data={aiCharacters} keyExtractor={it => it.id.toString()} renderItem={({ item: ai }) => {
+              const sel = selectedAIs.includes(ai.id);
+              return (
+                <TouchableOpacity style={[s.aiRow, sel && s.aiRowSel]} onPress={() => toggleAISelection(ai.id)}>
+                  <SafeAvatar uri={ai.avatar} size={44} name={ai.name || 'A'} color={cs[ai.id % cs.length]} />
+                  <View style={s.aiInfo}>
+                    <Text style={s.aiName}>{ai.name}</Text>
+                    <Text style={s.aiDesc}>{ai.personality || '友好'}</Text>
+                  </View>
+                  <Ionicons name={sel ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={sel ? '#4A90D9' : '#ccc'} />
+                </TouchableOpacity>
+              );
+            }} contentContainerStyle={s.aiList} />
+            <TouchableOpacity style={[s.btn, selectedAIs.length < 2 && s.btnDis]} onPress={createGroupChat} disabled={selectedAIs.length < 2}>
+              <Text style={s.btnText}>创建群聊 ({selectedAIs.length}人)</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -319,214 +236,51 @@ export default function HomeScreen() {
   );
 }
 
-const getAvatarColor = (id) => {
-  const colors = ['#4A90D9', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C'];
-  return colors[(id - 1) % colors.length];
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  actionButton: {
-    alignItems: 'center',
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: '#666',
-  },
-  conversationItem: {
-    flexDirection: 'row',
-    padding: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  avatarContainer: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#F56C6C',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  conversationInfo: {
-    flex: 1,
-    marginLeft: 12,
-    justifyContent: 'center',
-  },
-  conversationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  conversationName: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#333',
-  },
-  conversationNameUnread: {
-    fontWeight: '600',
-  },
-  conversationTime: {
-    fontSize: 12,
-    color: '#999',
-  },
-  conversationTimeUnread: {
-    color: '#4A90D9',
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
-  },
-  lastMessageUnread: {
-    color: '#666',
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#999',
-    marginTop: 16,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#ccc',
-    marginTop: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  aiList: {
-    padding: 8,
-  },
-  aiItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  aiAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  aiAvatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  aiInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  aiName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  aiPersonality: {
-    fontSize: 13,
-    color: '#999',
-    marginTop: 2,
-  },
-  aiItemSelected: {
-    backgroundColor: '#4A90D915',
-  },
-  groupHint: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    paddingVertical: 10,
-  },
-  createGroupButton: {
-    backgroundColor: '#4A90D9',
-    margin: 16,
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  createGroupButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  createGroupButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  topBar: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
+  actionChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#f5f5f5' },
+  actionChipText: { fontSize: 13, color: '#666', fontWeight: '500' },
+  fab: { position: 'absolute', bottom: 24, right: 20, width: 52, height: 52, borderRadius: 18, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, borderWidth: 1, borderColor: '#eee' },
+  fabActive: { backgroundColor: '#f0f0f0', borderColor: '#ddd' },
+  fabOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.15)' },
+  fabMenu: { position: 'absolute', bottom: 90, right: 20, backgroundColor: '#fff', borderRadius: 16, padding: 8, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12 },
+  fabItem: { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
+  fabIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  fabLabel: { fontSize: 15, color: '#333', fontWeight: '500' },
+  listContent: { paddingTop: 6, paddingBottom: 20 },
+  item: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', marginHorizontal: 12, marginTop: 6, padding: 14, borderRadius: 14 },
+  itemUnread: { backgroundColor: '#4A90D908' },
+  avatarWrap: { position: 'relative' },
+  groupBadge: { position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' },
+  badge: { position: 'absolute', top: -4, right: -6, backgroundColor: '#F56C6C', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+  info: { flex: 1, marginLeft: 12 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  name: { fontSize: 16, color: '#333' },
+  nameBold: { fontWeight: '700' },
+  time: { fontSize: 12, color: '#bbb' },
+  timeNew: { color: '#4A90D9', fontWeight: '500' },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 },
+  msg: { fontSize: 14, color: '#999', flex: 1 },
+  msgBold: { color: '#666', fontWeight: '500' },
+  groupTag: { fontSize: 10, color: '#67C23A', backgroundColor: '#67C23A15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  empty: { alignItems: 'center', paddingTop: 80 },
+  emptyIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: 18, color: '#999', fontWeight: '500' },
+  emptySub: { fontSize: 14, color: '#ccc', marginTop: 4 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%', paddingBottom: 20 },
+  sheetHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
+  sheetTitle: { fontSize: 18, fontWeight: '600', color: '#333' },
+  hint: { fontSize: 13, color: '#999', textAlign: 'center', paddingVertical: 10 },
+  aiList: { paddingHorizontal: 8 },
+  aiRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#f0f0f0' },
+  aiRowSel: { backgroundColor: '#4A90D908' },
+  aiInfo: { flex: 1, marginLeft: 12 },
+  aiName: { fontSize: 16, fontWeight: '500', color: '#333' },
+  aiDesc: { fontSize: 13, color: '#999', marginTop: 2 },
+  btn: { backgroundColor: '#4A90D9', margin: 16, padding: 14, borderRadius: 12, alignItems: 'center' },
+  btnDis: { backgroundColor: '#ccc' },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
