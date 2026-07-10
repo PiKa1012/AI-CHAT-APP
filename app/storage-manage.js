@@ -37,6 +37,8 @@ export default function StorageManageScreen() {
   const loadConversations = useAppStore(s => s.loadConversations);
   const aiCharacters = useAppStore(s => s.aiCharacters);
 
+  const [convMembers, setConvMembers] = useState([]);
+
   useEffect(() => { loadCharStorage(); }, []);
 
   useFocusEffect(useCallback(() => {
@@ -49,6 +51,7 @@ export default function StorageManageScreen() {
     try {
       const chars = await executeQuery('SELECT * FROM ai_characters WHERE is_active = 1');
       const convMembers = await executeQuery('SELECT * FROM conversation_members WHERE member_type = ?', ['ai']);
+      setConvMembers(convMembers);
 
       const charMap = {};
       for (const char of chars) {
@@ -105,7 +108,7 @@ export default function StorageManageScreen() {
         charMap[char.id].totalSize = chatSize + genSize;
       }
 
-      const list = Object.values(charMap).filter(c => c.totalSize > 0).sort((a, b) => b.totalSize - a.totalSize);
+      const list = Object.values(charMap).sort((a, b) => b.totalSize - a.totalSize);
       setCharStorage(list);
       let allSize = list.reduce((s, c) => s + c.totalSize, 0);
 
@@ -434,7 +437,8 @@ export default function StorageManageScreen() {
                 <Text style={styles.clearAllBtnText}>清空所有聊天记录</Text>
               </TouchableOpacity>
               {conversations.length > 0 && conversations.map(conv => {
-                const convAi = conv.type === 'private' ? aiCharacters.find(a => a.name === conv.name) : null;
+                const memberId = conv.type === 'private' ? convMembers.find(m => m.conversation_id === conv.id)?.member_id : null;
+                const convAi = memberId ? aiCharacters.find(a => a.id === memberId) : null;
                 return (
                 <TouchableOpacity key={conv.id} style={styles.chatItem} onPress={() => handleClearChat(conv)}>
                   <SafeAvatar uri={conv.avatar || convAi?.avatar} size={32} name={conv.name} color={conv.type === 'group' ? '#67C23A' : '#4A90D9'} />
