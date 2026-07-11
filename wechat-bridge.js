@@ -53,7 +53,16 @@ async function callAI(userId, text) {
     body: JSON.stringify({ model: config.model, messages, max_tokens: config.maxTokens, temperature: 0.7 }),
   });
   const data = await res.json();
-  const reply = data.choices?.[0]?.message?.content || '抱歉，我没理解';
+  const raw = data.choices?.[0]?.message?.content || '';
+  const reply = raw
+    ? raw.replace(/```[\s\S]*?```/g, '')
+        .replace(/^你是[^\n]*\n?/gm, '')
+        .replace(/^性格[^\n]*\n?/gm, '')
+        .replace(/^当前时间[^\n]*\n?/gm, '')
+        .replace(/^请用符合[^\n]*\n?/gm, '')
+        .replace(/^不要使用[^\n]*\n?/gm, '')
+        .replace(/\n{3,}/g, '\n').trim()
+    : '抱歉，我没理解';
 
   sessions[userId].push({ role: 'assistant', content: reply });
   saveSessions();

@@ -268,9 +268,7 @@ class CallSession {
         if (data === '[DONE]') { console.log('[LLM] [DONE]'); continue; }
         try {
           const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta?.content
-            || parsed.choices?.[0]?.delta?.reasoning_content
-            || '';
+          const delta = parsed.choices?.[0]?.delta?.content || '';
           fullText += delta;
         } catch (e) {}
       }
@@ -279,11 +277,32 @@ class CallSession {
     // 去掉思考过程，只保留真正的回复
     console.log(`[LLM思考] ${fullText.slice(0, 300)}`);
     let reply = fullText
-      .replace(/（[^）]*）/g, '')   // 闭合的括号内容
-      .replace(/（[^）]*/g, '')     // 未闭合的括号（截断的思考）
-      .replace(/[）]/g, '')          // 残留的右括号
-      .replace(/。/g, '。')
+      .replace(/（[^）]*）/g, '')
+      .replace(/（[^）]*/g, '')
+      .replace(/[）]/g, '')
+      .replace(/\([^)]*\)/g, '')
+      .replace(/\([^)]*/g, '')
+      .replace(/[\)]/g, '')
+      .replace(/【[^】]*】/g, '')
+      .replace(/\n{3,}/g, '\n')
       .trim();
+
+    if (/^(你是|性格|当前时间|请以|我的名字是|用户的名字是|回复要符合)/.test(reply)) {
+      reply = reply.replace(/^你[^\n]*\n?/, '')
+        .replace(/^性格[^\n]*\n?/, '')
+        .replace(/^当前时间[^\n]*\n?/, '')
+        .replace(/^请以[^\n]*\n?/, '')
+        .replace(/^我的名字[^\n]*\n?/, '')
+        .replace(/^用户的名字[^\n]*\n?/, '')
+        .replace(/^回复要符合[^\n]*\n?/, '')
+        .replace(/^不要使用[^\n]*\n?/g, '')
+        .replace(/^请用符合[^\n]*\n?/g, '')
+        .trim();
+    }
+
+    if (!reply || reply.length < 2) {
+      reply = '嗯嗯，好的';
+    }
 
     console.log(`[LLM] 最终回复: "${reply.slice(0, 100)}"`);
     if (reply) {

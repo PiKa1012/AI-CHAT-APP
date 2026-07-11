@@ -1,6 +1,6 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { useAppStore } from '../stores';
-import { aiAutoPostMoment, aiAutoChat, getPersonalityPrompt, callAIAPI } from './ai';
+import { aiAutoPostMoment, aiAutoChat, getPersonalityPrompt, callAIAPI, sanitizeAIOutput } from './ai';
 import { sendLocalNotification } from './notification';
 import { generateDiary } from './diary';
 import { generateProactiveMessage } from './proactive';
@@ -178,7 +178,7 @@ async function executeAutoChat(task) {
         const ai = await executeQuery('SELECT * FROM ai_characters WHERE id = ? AND is_active = 1', [task.ai_id]);
         if (ai.length > 0) {
           const prompt = getPersonalityPrompt(ai[0]) + '\n在群里说一句话，要自然，像普通聊天。只输出内容。';
-          const content = await callAIAPI([{ role: 'user', content: '在群里说句话' }], prompt);
+          const content = sanitizeAIOutput(await callAIAPI([{ role: 'user', content: '在群里说句话' }], prompt));
           const store = useAppStore.getState();
           await store.sendMessage(conversationId, 'ai', task.ai_id, content);
           
@@ -224,7 +224,7 @@ async function executeSendMessage(task) {
     let message;
     if (task.content) {
       const prompt = getPersonalityPrompt(ai[0]) + `\n用户设置了提醒：${task.content}\n请用自然的方式提醒用户，可以适当扩展内容。只输出消息内容。`;
-      message = await callAIAPI([{ role: 'user', content: '提醒用户' }], prompt);
+      message = sanitizeAIOutput(await callAIAPI([{ role: 'user', content: '提醒用户' }], prompt));
     } else {
       message = await generateProactiveMessage(task.ai_id);
     }

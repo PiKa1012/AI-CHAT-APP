@@ -8,6 +8,25 @@ const VOICES = [
   { id: '可爱', name: '可爱' }, { id: '成熟', name: '成熟' },
 ];
 
+const SW = ({ icon, color, label, desc, value, onChange }) => (
+  <View style={st.swRow}>
+    <View style={st.swInfo}>
+      {icon && <Ionicons name={icon} size={18} color={color} />}
+      <Text style={st.swLabel}>{label}</Text>
+      {desc && <Text style={st.swDesc}>{desc}</Text>}
+    </View>
+    <Switch value={value} onValueChange={onChange} trackColor={{ true: color }} />
+  </View>
+);
+const I = ({ label, value, onChangeText, placeholder, secure, hint }) => (
+  <View>
+    <Text style={st.label}>{label}</Text>
+    <TextInput style={st.input} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#999" secureTextEntry={secure} />
+    {hint && <Text style={st.hint}>{hint}</Text>}
+  </View>
+);
+const B = ({ text, onPress, disabled }) => <TouchableOpacity style={st.btn} onPress={onPress} disabled={disabled}><Text style={st.btnText}>{disabled ? '测试中...' : text}</Text></TouchableOpacity>;
+
 export default function VoiceSettings() {
   const [tts, setTts] = useState(true); const [tv, setTv] = useState('默认');
   const [avm, setAvm] = useState(false); const [avf, setAvf] = useState(30);
@@ -47,25 +66,6 @@ export default function VoiceSettings() {
     setTesting(false);
   };
 
-  const SW = ({ icon, color, label, desc, value, onChange }) => (
-    <View style={st.swRow}>
-      <View style={st.swInfo}>
-        {icon && <Ionicons name={icon} size={18} color={color} />}
-        <Text style={st.swLabel}>{label}</Text>
-        {desc && <Text style={st.swDesc}>{desc}</Text>}
-      </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: color }} />
-    </View>
-  );
-  const I = ({ label, value, onChange, placeholder, secure, hint }) => (
-    <View>
-      <Text style={st.label}>{label}</Text>
-      <TextInput style={st.input} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor="#999" secureTextEntry={secure} />
-      {hint && <Text style={st.hint}>{hint}</Text>}
-    </View>
-  );
-  const B = ({ text, onPress }) => <TouchableOpacity style={st.btn} onPress={onPress} disabled={testing}><Text style={st.btnText}>{testing ? '测试中...' : text}</Text></TouchableOpacity>;
-
   return (
     <ScrollView style={st.ctn}>
       <View style={st.sec}>
@@ -79,7 +79,7 @@ export default function VoiceSettings() {
           <I label="讯飞 API Key" value={xk} onChangeText={setXk} placeholder="讯飞 API Key" secure />
           <I label="讯飞 API Secret" value={xs} onChangeText={setXs} placeholder="讯飞 API Secret" secure />
           <I label="服务器地址" value={vurl} onChangeText={setVurl} placeholder="ws://你的服务器IP:3002/voice" hint="语音通话服务器地址，端口 3002" />
-          <B onPress={testVoice} text="测试语音连接" />
+          <B onPress={testVoice} text="测试语音连接" disabled={testing} />
         </View>}
       </View>
       <TouchableOpacity style={st.save} onPress={save}><Text style={st.saveText}>保存设置</Text></TouchableOpacity>

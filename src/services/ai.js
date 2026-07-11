@@ -115,6 +115,38 @@ ${relationship}
 回复要符合当前时间的语境。`;
 }
 
+export function sanitizeAIOutput(text) {
+  if (!text || typeof text !== 'string') return text || '';
+
+  let cleaned = text
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/^你是[^，,\n]{0,30}，[^\n]*\n?/gm, '')
+    .replace(/^性格[^\n]*\n?/gm, '')
+    .replace(/^年龄[^\n]*\n?/gm, '')
+    .replace(/^性别[^\n]*\n?/gm, '')
+    .replace(/^背景[^\n]*\n?/gm, '')
+    .replace(/^兴趣爱好[^\n]*\n?/gm, '')
+    .replace(/^说话风格[^\n]*\n?/gm, '')
+    .replace(/^与用户的关系[^\n]*\n?/gm, '')
+    .replace(/^当前时间[^\n]*\n?/gm, '')
+    .replace(/^请用符合[^\n]*\n?/gm, '')
+    .replace(/^不要使用[^\n]*\n?/gm, '')
+    .replace(/^回复要符合[^\n]*\n?/gm, '')
+    .replace(/^我的名字是[^\n]*\n?/gm, '')
+    .replace(/^用户的名字是[^\n]*\n?/gm, '')
+    .replace(/^你是一个[^\n]*\n?/gm, '')
+    .replace(/^system[：:][^\n]*\n?/gim, '')
+    .replace(/^(?:system prompt|提示词|prompt)[^\n]*\n?/gim, '')
+    .replace(/\n{3,}/g, '\n')
+    .trim();
+
+  if (!cleaned || cleaned.length < 2) {
+    return text.replace(/```[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n').trim() || '嗯嗯，好的';
+  }
+
+  return cleaned;
+}
+
 export async function getAIResponse(aiId, userMessage, recentMessages = []) {
   const ai = await executeQuery('SELECT * FROM ai_characters WHERE id = ?', [aiId]);
   if (ai.length === 0) throw new Error('AI角色不存在');
@@ -196,7 +228,7 @@ export async function getAIResponse(aiId, userMessage, recentMessages = []) {
   const updatedMood = await analyzeAndUpdateMood(aiId, userMessage, apiResponse, character);
   const emoji = await tryGetEmojiForResponse(character, apiResponse, updatedMood);
   
-  return { text: apiResponse, emoji, mood: updatedMood.mood };
+  return { text: sanitizeAIOutput(apiResponse), emoji, mood: updatedMood.mood };
 }
 
 export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
@@ -254,7 +286,7 @@ export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
   const updatedMood = await analyzeAndUpdateMood(aiId, lastMessage?.content || '', apiResponse, character);
   const emoji = await tryGetEmojiForResponse(character, apiResponse, updatedMood);
   
-  return { text: apiResponse, emoji, mood: updatedMood.mood };
+  return { text: sanitizeAIOutput(apiResponse), emoji, mood: updatedMood.mood };
 }
 
 export function findMentionedAI(message, aiCharacters) {
@@ -316,7 +348,7 @@ export async function aiAutoPostMoment(aiId, userRequest = null, recentMessages 
 请发一条朋友圈，内容要自然真实，像普通人发的朋友圈。用第一人称"我"来写，不要出现我自己的名字。${userReq}${chatContext}
 只输出朋友圈正文和配图描述，不要输出其他解释。按照以下格式输出（将括号内容替换为实际文字）：
 ${formatHint}`;
-  const raw = await callAIAPI([{ role: 'user', content: '发一条朋友圈' }], prompt);
+  const raw = sanitizeAIOutput(await callAIAPI([{ role: 'user', content: '发一条朋友圈' }], prompt));
 
   const match = raw.match(/内容[：:]\s*([\s\S]+?)(?=\n*\s*(?:配图|回复)[：:]|\s*$)/);
   let content = match ? match[1].trim() : '';
@@ -451,7 +483,8 @@ export async function aiCommentOnMoment(momentId, parentCommentId = null, userCo
     prompt = getPersonalityPrompt(replyAI) + `\n给这条朋友圈评论："${momentText}"${imageContext}\n只输出评论内容，不要其他解释。`;
   }
   
-  const comment = await callAIAPI([{ role: 'user', content: userComment ? '回复用户' : '评论朋友圈' }], prompt);
+  const rawComment = await callAIAPI([{ role: 'user', content: userComment ? '回复用户' : '评论朋友圈' }], prompt);
+  const comment = sanitizeAIOutput(rawComment);
 
   const store = useAppStore.getState();
   const newCommentId = await store.commentOnMoment(momentId, 'ai', replyAI.id, comment, parentCommentId);
@@ -467,7 +500,7 @@ export async function aiAutoChat() {
 
   const randomAI = ais[Math.floor(Math.random() * ais.length)];
   const prompt = getPersonalityPrompt(randomAI) + '\n在群里说一句话，要自然，像普通聊天。只输出内容。';
-  const content = await callAIAPI([{ role: 'user', content: '在群里说句话' }], prompt);
+  const content = sanitizeAIOutput(await callAIAPI([{ role: 'user', content: '在群里说句话' }], prompt));
 
   const store = useAppStore.getState();
   await store.sendMessage(conversations[0].id, 'ai', randomAI.id, content);

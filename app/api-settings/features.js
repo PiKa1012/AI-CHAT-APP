@@ -5,6 +5,24 @@ import { saveSetting, loadSetting, clearAPISettingsCache } from '../../src/servi
 
 const OPT = [{ v: 10, l: '低' }, { v: 30, l: '中' }, { v: 50, l: '高' }, { v: 70, l: '很高' }];
 
+const SW = ({ icon, color, label, desc, value, onChange }) => (
+  <View style={st.swRow}>
+    <View style={st.swInfo}>
+      {icon && <Ionicons name={icon} size={18} color={color} />}
+      <Text style={st.swLabel}>{label}</Text>
+      {desc && <Text style={st.swDesc}>{desc}</Text>}
+    </View>
+    <Switch value={value} onValueChange={onChange} trackColor={{ true: color }} />
+  </View>
+);
+const I = ({ label, value, onChangeText, placeholder, secure }) => (
+  <View>
+    <Text style={st.label}>{label}</Text>
+    <TextInput style={st.input} value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#999" secureTextEntry={secure} />
+  </View>
+);
+const B = ({ text, onPress, disabled }) => <TouchableOpacity style={st.btn} onPress={onPress} disabled={disabled}><Text style={st.btnText}>{disabled ? '测试中...' : text}</Text></TouchableOpacity>;
+
 export default function FeaturesSettings() {
   const [search, setSearch] = useState(false); const [sk, setSk] = useState('');
   const [vis, setVis] = useState(false); const [vk, setVk] = useState(''); const [vu, setVu] = useState(''); const [vm, setVm] = useState('');
@@ -35,31 +53,13 @@ export default function FeaturesSettings() {
   const testVis = async () => { if (!vk) return Alert.alert('提示', '请先输入 API Key'); const r = await fetch(`${vu || 'https://api.openai.com'}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${vk}` }, body: JSON.stringify({ model: vm || 'gpt-4o', messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }) }); if (!r.ok) throw new Error(`HTTP ${r.status}`); Alert.alert('成功', '连接正常'); };
   const testGen = async () => { if (!gk) return Alert.alert('提示', '请先输入 API Key'); const r = await fetch(`${gu || 'https://api.siliconflow.cn/v1'}/images/generations`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${gk}` }, body: JSON.stringify({ model: gmodel || 'stabilityai/stable-diffusion-xl-base-1.0', prompt: 'a cute cat', image_size: '512x512' }) }); if (!r.ok) throw new Error(`HTTP ${r.status}`); Alert.alert('成功', '连接正常'); };
 
-  const SW = ({ icon, color, label, desc, value, onChange }) => (
-    <View style={st.swRow}>
-      <View style={st.swInfo}>
-        {icon && <Ionicons name={icon} size={18} color={color} />}
-        <Text style={st.swLabel}>{label}</Text>
-        {desc && <Text style={st.swDesc}>{desc}</Text>}
-      </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: color }} />
-    </View>
-  );
-  const I = ({ label, value, onChange, placeholder, secure }) => (
-    <View>
-      <Text style={st.label}>{label}</Text>
-      <TextInput style={st.input} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor="#999" secureTextEntry={secure} />
-    </View>
-  );
-  const B = ({ text, onPress }) => <TouchableOpacity style={st.btn} onPress={onPress} disabled={!!t}><Text style={st.btnText}>{t ? '测试中...' : text}</Text></TouchableOpacity>;
-
   return (
     <ScrollView style={st.ctn}>
       <View style={st.sec}>
         <SW icon="search" color="#4A90D9" label="联网搜索" desc="博查AI搜索最新信息" value={search} onChange={setSearch} />
-        {search && <View style={st.sub}><I label="搜索 API Key" value={sk} onChangeText={setSk} placeholder="输入博查搜索API Key" secure /><B onPress={() => doTest(testSearch, '搜索')} text="测试连接" /></View>}
+        {search && <View style={st.sub}><I label="搜索 API Key" value={sk} onChangeText={setSk} placeholder="输入博查搜索API Key" secure /><B onPress={() => doTest(testSearch, '搜索')} text="测试连接" disabled={!!t} /></View>}
         <SW icon="image" color="#9B59B6" label="图像识别" desc="识别发送的图片内容" value={vis} onChange={setVis} />
-        {vis && <View style={st.sub}><I label="视觉 API Key" value={vk} onChangeText={setVk} placeholder="如 moonshot API Key" secure /><I label="视觉 API 地址" value={vu} onChangeText={setVu} placeholder="如 https://api.moonshot.cn" /><I label="视觉模型" value={vm} onChangeText={setVm} placeholder="如 moonshot-v1-128k-vision-preview" /><B onPress={() => doTest(testVis, '视觉')} text="测试连接" /></View>}
+        {vis && <View style={st.sub}><I label="视觉 API Key" value={vk} onChangeText={setVk} placeholder="如 moonshot API Key" secure /><I label="视觉 API 地址" value={vu} onChangeText={setVu} placeholder="如 https://api.moonshot.cn" /><I label="视觉模型" value={vm} onChangeText={setVm} placeholder="如 moonshot-v1-128k-vision-preview" /><B onPress={() => doTest(testVis, '视觉')} text="测试连接" disabled={!!t} /></View>}
         <SW icon="brush" color="#FF69B4" label="AI 生图" desc="自动为内容配图" value={gen} onChange={setGen} />
         {gen && <View style={st.sub}>
           <View style={st.swRow}><View style={st.swInfo}><Ionicons name="images" size={18} color="#E6A23C" /><Text style={st.swLabel}>朋友圈配图</Text></View><Switch value={gm} onValueChange={setGm} trackColor={{ true: '#E6A23C' }} /></View>
@@ -68,7 +68,7 @@ export default function FeaturesSettings() {
           <I label="生图 API Key" value={gk} onChangeText={setGk} placeholder="硅基流动等 API Key" secure />
           <I label="生图 API 地址" value={gu} onChangeText={setGu} placeholder="https://api.siliconflow.cn/v1" />
           <I label="生图模型" value={gmodel} onChangeText={setGmodel} placeholder="stabilityai/stable-diffusion-xl-base-1.0" />
-          <B onPress={() => doTest(testGen, '生图')} text="测试连接" />
+          <B onPress={() => doTest(testGen, '生图')} text="测试连接" disabled={!!t} />
         </View>}
         <SW icon="happy" color="#E6A23C" label="AI 发表情" desc="根据心情发表情包" value={emoji} onChange={setEmoji} />
         {emoji && <View style={st.sub}><Text style={st.label}>发表情频率</Text><View style={st.optGrid}>{OPT.map(o => <TouchableOpacity key={o.v} style={[st.opt, ef === o.v && st.optActive]} onPress={() => setEf(o.v)}><Text style={[st.optName, ef === o.v && st.optNameActive]}>{o.l}</Text></TouchableOpacity>)}</View></View>}

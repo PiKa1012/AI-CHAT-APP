@@ -3,6 +3,7 @@ import { getCurrentTimeInfo, getBeijingToday } from '../utils/time';
 import { getAPISettings, loadSetting } from './settings';
 import { generateDiaryImage } from './imageGen';
 import { callAIAPI } from './api-client';
+import { sanitizeAIOutput } from './ai';
 
 export async function getTodayContext(aiId) {
   const today = getBeijingToday();
@@ -90,7 +91,7 @@ ${contextText}${avoidRepeat}
 
 只输出以上格式，不要其他解释。`;
 
-  const result = await callAIAPI([{ role: 'user', content: '请写今天的日记' }], prompt, { max_tokens: 4096, temperature: 0.8, endpoint: 'diary' });
+  const result = sanitizeAIOutput(await callAIAPI([{ role: 'user', content: '请写今天的日记' }], prompt, { max_tokens: 4096, temperature: 0.8, endpoint: 'diary' }));
   
   const titleMatch = result.match(/标题[：:]\s*(.+)/);
   const contentMatch = result.match(/内容[：:]\s*([\s\S]+?)(?=\n心情[：:]|\n天气[：:]|$)/);
@@ -98,7 +99,7 @@ ${contextText}${avoidRepeat}
   const weatherMatch = result.match(/天气[：:]\s*(.+)/);
 
   const title = titleMatch?.[1]?.trim() || `${character.name}的日记`;
-  const content = contentMatch?.[1]?.trim() || result;
+  const content = contentMatch?.[1]?.trim() || `${character.name}今天过得很平静。`;
   const mood = moodMatch?.[1]?.trim() || '平静';
   const weather = weatherMatch?.[1]?.trim() || '';
 
@@ -248,7 +249,8 @@ export async function aiReplyToDiaryComment(diaryId, userComment) {
 请用第一人称回复${userName}的这条回应，语气自然真诚，像朋友聊天一样。
 只输出回复内容，不要加引号。`;
 
-    const reply = await callAIAPI([{ role: 'user', content: '回复用户' }], prompt, { max_tokens: 4096, temperature: 0.8, endpoint: 'diary' });
+    const rawReply = await callAIAPI([{ role: 'user', content: '回复用户' }], prompt, { max_tokens: 4096, temperature: 0.8, endpoint: 'diary' });
+    const reply = sanitizeAIOutput(rawReply);
     if (reply) {
       await executeInsert(
         'INSERT INTO diary_comments (diary_id, author_type, author_id, content) VALUES (?, ?, ?, ?)',
