@@ -3,7 +3,7 @@
 一个 AI 陪伴社交应用，基于 Expo SDK 52 + React Native + Expo Router 构建。
 
 **作者：** [PiKa1012](https://github.com/PiKa1012)  
-**版本：** v1.2.0 — 查看 [Releases](https://github.com/PiKa1012/AI-CHAT-APP/releases) 获取最新版本
+**版本：** v1.2.1 — 查看 [Releases](https://github.com/PiKa1012/AI-CHAT-APP/releases) 获取最新版本
 
 ## 功能
 
