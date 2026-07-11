@@ -1,5 +1,6 @@
 import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { callAIAPI } from './api-client';
+import { extractJSON } from './memory';
 
 const EMOTIONS = {
   happy: { name: '开心', emoji: '😊', valence: 1 },
@@ -125,12 +126,12 @@ ${name}：${aiResponse}
     const content = await callAIAPI(
       [{ role: 'user', content: prompt }],
       '你是一个情绪分析助手，严格按用户要求的JSON格式输出，不要输出其他内容。',
-      { max_tokens: 300, temperature: 0.3, endpoint: 'emotion' }
+      { max_tokens: 600, temperature: 0.3, endpoint: 'emotion' }
     );
 
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+    const parsed = extractJSON(content);
+    if (parsed && parsed.mood) {
+      return parsed;
     }
   } catch (error) {
     console.error('情绪分析API错误:', error);

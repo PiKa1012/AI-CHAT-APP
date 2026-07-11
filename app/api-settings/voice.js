@@ -3,11 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect } from 'react';
 import { saveSetting, loadSetting, clearAPISettingsCache } from '../../src/services/settings';
 
-const VOICES = [
-  { id: '默认', name: '默认' }, { id: '甜美', name: '甜美' }, { id: '磁性', name: '磁性' },
-  { id: '可爱', name: '可爱' }, { id: '成熟', name: '成熟' },
-];
-
 const SW = ({ icon, color, label, desc, value, onChange }) => (
   <View style={st.swRow}>
     <View style={st.swInfo}>
@@ -28,7 +23,6 @@ const I = ({ label, value, onChangeText, placeholder, secure, hint }) => (
 const B = ({ text, onPress, disabled }) => <TouchableOpacity style={st.btn} onPress={onPress} disabled={disabled}><Text style={st.btnText}>{disabled ? '测试中...' : text}</Text></TouchableOpacity>;
 
 export default function VoiceSettings() {
-  const [tts, setTts] = useState(true); const [tv, setTv] = useState('默认');
   const [avm, setAvm] = useState(false); const [avf, setAvf] = useState(30);
   const [vc, setVc] = useState(false);
   const [xa, setXa] = useState(''); const [xk, setXk] = useState(''); const [xs, setXs] = useState('');
@@ -38,7 +32,6 @@ export default function VoiceSettings() {
   useEffect(() => { load(); }, []);
   const load = async () => {
     const d = await loadSetting('api_settings', {});
-    setTts(d.enableTTS !== false); setTv(d.ttsVoice || '默认');
     setAvm(d.enableAIVoiceMsg || false); setAvf(d.aiVoiceMsgFrequency || 30);
     setVc(d.enableVoiceCall || false);
     setXa(d.xfAppId || ''); setXk(d.xfApiKey || ''); setXs(d.xfApiSecret || '');
@@ -46,7 +39,7 @@ export default function VoiceSettings() {
   };
   const save = async () => {
     const d = await loadSetting('api_settings', {});
-    await saveSetting('api_settings', { ...d, enableTTS: tts, ttsVoice: tv, enableAIVoiceMsg: avm, aiVoiceMsgFrequency: avf, enableVoiceCall: vc, xfAppId: xa, xfApiKey: xk, xfApiSecret: xs, voiceServerUrl: vurl });
+    await saveSetting('api_settings', { ...d, enableAIVoiceMsg: avm, aiVoiceMsgFrequency: avf, enableVoiceCall: vc, xfAppId: xa, xfApiKey: xk, xfApiSecret: xs, voiceServerUrl: vurl });
     clearAPISettingsCache();
     Alert.alert('成功', '已保存');
   };
@@ -69,8 +62,6 @@ export default function VoiceSettings() {
   return (
     <ScrollView style={st.ctn}>
       <View style={st.sec}>
-        <SW icon="volume-high" color="#67C23A" label="消息朗读" desc="小喇叭朗读 AI 文字" value={tts} onChange={setTts} />
-        {tts && <View style={st.sub}><Text style={st.label}>音色</Text><View style={st.voiceGrid}>{VOICES.map(v => <TouchableOpacity key={v.id} style={[st.voice, tv === v.id && st.voiceActive]} onPress={() => setTv(v.id)}><Text style={[st.voiceLabel, tv === v.id && st.voiceLabelActive]}>{v.name}</Text></TouchableOpacity>)}</View></View>}
         <SW icon="chatbubble-ellipses" color="#9B59B6" label="AI 语音消息" desc="AI 以语音条回复" value={avm} onChange={setAvm} />
         {avm && <View style={st.sub}><Text style={st.label}>语音频率</Text><View style={st.optGrid}>{[{ v: 10, l: '10%' }, { v: 30, l: '30%' }, { v: 50, l: '50%' }, { v: 100, l: '每次' }].map(o => <TouchableOpacity key={o.v} style={[st.opt, avf === o.v && st.optActive]} onPress={() => setAvf(o.v)}><Text style={[st.optName, avf === o.v && st.optNameActive]}>{o.l}</Text></TouchableOpacity>)}</View></View>}
         <SW label="📞 语音通话" desc="拨打电话式 AI 对话" value={vc} onChange={setVc} />
@@ -105,11 +96,6 @@ const st = StyleSheet.create({
   optActive: { backgroundColor: '#4A90D915', borderColor: '#4A90D9' },
   optName: { fontSize: 14, color: '#666' },
   optNameActive: { color: '#4A90D9', fontWeight: '500' },
-  voiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  voice: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: '#f5f5f5', borderWidth: 2, borderColor: 'transparent' },
-  voiceActive: { backgroundColor: '#4A90D915', borderColor: '#4A90D9' },
-  voiceLabel: { fontSize: 13, color: '#666' },
-  voiceLabelActive: { color: '#4A90D9', fontWeight: '500' },
   save: { backgroundColor: '#67C23A', borderRadius: 8, padding: 16, alignItems: 'center', margin: 16 },
   saveText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

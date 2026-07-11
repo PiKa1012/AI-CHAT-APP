@@ -23,7 +23,7 @@ export default function APISettingsIndex() {
       else sm.model = '未配置 API Key';
       const f = [d.enableSearch, d.enableImageRecognition, d.enableImageGen, d.enableEmoji].filter(Boolean).length;
       sm.features = f > 0 ? `已开启 ${f} 项功能` : '未开启任何功能';
-      const v = [d.enableTTS, d.enableAIVoiceMsg, d.enableVoiceCall].filter(Boolean).length;
+      const v = [d.enableAIVoiceMsg, d.enableVoiceCall].filter(Boolean).length;
       sm.voice = v > 0 ? `已开启 ${v} 项` : '未开启任何功能';
       const s = [d.enableMusic, d.enableMap].filter(Boolean).length;
       sm.services = s > 0 ? `已连接 ${s} 项服务` : '未连接任何服务';

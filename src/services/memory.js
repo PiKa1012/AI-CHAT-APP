@@ -2,6 +2,18 @@ import { executeQuery, executeInsert, executeUpdate } from '../database';
 import { getAPISettings } from './settings';
 import { callAIAPI } from './api-client';
 
+export function extractJSON(text) {
+  if (!text) return null;
+  try { return JSON.parse(text); } catch {}
+  const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (m) { try { return JSON.parse(m[1]); } catch {} }
+  const arr = text.match(/\[[\s\S]*\]/);
+  if (arr) { try { return JSON.parse(arr[0]); } catch {} }
+  const obj = text.match(/\{[\s\S]*\}/);
+  if (obj) { try { return JSON.parse(obj[0]); } catch {} }
+  return null;
+}
+
 const MEMORY_TYPES = {
   FACT: 'fact',
   PREFERENCE: 'preference',
@@ -109,20 +121,16 @@ ${conversationText}
 如果对话中没有值得记忆的信息，输出空数组：[]
 只输出JSON，不要其他文字。`;
 
-    const response = await callAIAPI([{ role: 'user', content: prompt }], '', { max_tokens: 200, temperature: 0.3, endpoint: 'memory' });
+    const response = await callAIAPI([{ role: 'user', content: prompt }], '', { max_tokens: 1000, temperature: 0.3, endpoint: 'memory' });
     
-    try {
-      const memories = JSON.parse(response);
-      if (Array.isArray(memories)) {
-        for (const mem of memories) {
-          if (mem.content && mem.type) {
-            await saveMemory(aiId, mem.type, mem.content, 6);
-          }
+    const memories = extractJSON(response);
+    if (Array.isArray(memories)) {
+      for (const mem of memories) {
+        if (mem.content && mem.type) {
+          await saveMemory(aiId, mem.type, mem.content, 6);
         }
       }
-      } catch (e) {
-        console.warn('解析记忆JSON失败:', e?.message);
-      }
+    }
   } catch (e) {
     console.error('提取记忆失败:', e);
   }
@@ -175,17 +183,13 @@ AI：${aiResponse}
 只输出JSON，不要其他文字。`;
 
   try {
-    const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '你是一个信息提取助手，按用户要求的JSON格式输出。', { max_tokens: 300, endpoint: 'memory' });
-    try {
-      const parsed = JSON.parse(result);
-      if (parsed.type && parsed.type !== 'none' && parsed.content) {
-        await executeInsert(
-          'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
-          [aiId, parsed.type, parsed.content, 5]
-        );
-      }
-    } catch (e) {
-      console.warn(`解析${label}记忆JSON失败:`, e?.message);
+    const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '你是一个信息提取助手，按用户要求的JSON格式输出。', { max_tokens: 600, endpoint: 'memory' });
+    const parsed = extractJSON(result);
+    if (parsed && parsed.type && parsed.type !== 'none' && parsed.content) {
+      await executeInsert(
+        'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
+        [aiId, parsed.type, parsed.content, 5]
+      );
     }
   } catch (e) {
     console.warn(`保存${label}对话记忆失败:`, e?.message || e);
@@ -199,6 +203,7 @@ export function formatMemoriesForPrompt(memories) {
     fact: [],
     preference: [],
     event: [],
+    emotion: [],
     summary: [],
   };
 
@@ -218,6 +223,9 @@ export function formatMemoriesForPrompt(memories) {
   }
   if (grouped.event.length > 0) {
     result += `\n最近发生的事：\n${grouped.event.map(c => `- ${c}`).join('\n')}`;
+  }
+  if (grouped.emotion.length > 0) {
+    result += `\n重要的情绪记忆：\n${grouped.emotion.slice(0, 3).map(c => `- ${c}`).join('\n')}`;
   }
   if (grouped.summary.length > 0) {
     result += `\n之前的对话摘要：\n${grouped.summary.slice(0, 3).map(c => `- ${c}`).join('\n')}`;

@@ -477,10 +477,11 @@ export async function aiCommentOnMoment(momentId, parentCommentId = null, userCo
   }
   
   let prompt;
+  const userInfo = await getUserInfoPrompt();
   if (userComment) {
-    prompt = getPersonalityPrompt(replyAI) + `\n朋友圈内容："${momentText}"${imageContext}\n用户说："${userComment}"\n请回复用户，要自然，像朋友互动。只输出回复内容，不要其他解释。`;
+    prompt = getPersonalityPrompt(replyAI) + `\n朋友圈内容："${momentText}"${imageContext}\n用户说："${userComment}"\n请回复用户，要自然，像朋友互动。只输出回复内容，不要其他解释。${userInfo}`;
   } else {
-    prompt = getPersonalityPrompt(replyAI) + `\n给这条朋友圈评论："${momentText}"${imageContext}\n只输出评论内容，不要其他解释。`;
+    prompt = getPersonalityPrompt(replyAI) + `\n给这条朋友圈评论："${momentText}"${imageContext}\n只输出评论内容，不要其他解释。${userInfo}`;
   }
   
   const rawComment = await callAIAPI([{ role: 'user', content: userComment ? '回复用户' : '评论朋友圈' }], prompt);
