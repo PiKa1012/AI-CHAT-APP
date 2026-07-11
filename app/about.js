@@ -61,7 +61,7 @@ export default function AboutScreen() {
           <Image source={require('../assets/icon.png')} style={styles.appIcon} />
         </View>
         <Text style={styles.appName}>{APP_NAME}</Text>
-        <Text style={styles.tagline}>一个 AI 社交陪伴应用</Text>
+        <Text style={styles.tagline}>在数字世界里，遇见懂你的那个TA</Text>
 
         <View style={styles.badgeRow}>
           <View style={styles.badge}>

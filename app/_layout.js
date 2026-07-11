@@ -91,7 +91,6 @@ export default function RootLayout() {
         <Stack.Screen name="moment-detail" options={{ title: '动态详情' }} />
         <Stack.Screen name="diary-detail" options={{ title: '日记详情' }} />
         <Stack.Screen name="moment-feed" options={{ title: '动态' }} />
-        <Stack.Screen name="map-debug" options={{ title: '地图调试' }} />
         <Stack.Screen name="usage-stats" options={{ title: 'API用量' }} />
         <Stack.Screen name="about" options={{ title: '关于' }} />
         <Stack.Screen name="wechat-connect" options={{ title: '微信绑定' }} />

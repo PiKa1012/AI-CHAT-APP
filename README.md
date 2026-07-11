@@ -3,14 +3,14 @@
 一个 AI 陪伴社交应用，基于 Expo SDK 52 + React Native + Expo Router 构建。
 
 **作者：** [PiKa1012](https://github.com/PiKa1012)  
-**版本：** v1.0.0 — 查看 [Releases](https://github.com/PiKa1012/AI-CHAT-APP/releases) 获取最新版本
+**版本：** v1.2.0 — 查看 [Releases](https://github.com/PiKa1012/AI-CHAT-APP/releases) 获取最新版本
 
 ## 功能
 
 ### AI 聊天
 - 创建多个 AI 角色，设定性格、背景、说话风格、关系、年龄、性别
 - 私聊和群聊（多个 AI 同时在群中回复）
-- AI 情绪系统，11 种情绪状态，自然衰减，回复随心情变化
+- AI 情绪系统，14 种情绪状态，自然衰减，回复随心情变化
 - 长期记忆系统，自动提取并记住用户的喜好和经历的事
 - 自定义 API 配置，支持 3 个厂商：DeepSeek / OpenAI / 通义千问 / 自定义
 - 联网搜索、图片识别（Vision API）
@@ -28,7 +28,6 @@
 - 附近搜索、关键词查询、天气查询、地理编码/逆地理编码、路线规划
 - AI 自动识别意图（"附近有什么吃的"、"怎么去天安门"、"今天天气怎么样"）
 - IP 定位（无需 GPS 权限，无 Google Play 的国产机也能用）
-- 地图调试页面，可逐一测试各 API 并查看原始返回
 
 ### 朋友圈
 - 用户发布动态（文字 + 最多 9 张图片）
@@ -53,7 +52,7 @@
 ### 表情包
 - 自定义表情包，支持图文混合
 - AI 根据心情自动使用对应表情
-- 10 种情绪标签（开心、伤心、生气、孤独、惊喜等）
+- 14 种情绪标签（开心、伤心、生气、孤独、惊喜等）
 - 默认 40 个表情预置
 
 ### 语音
@@ -190,7 +189,7 @@ node voice-server.js
 │   ├── ai-manage.js                   # AI 角色 CRUD
 │   ├── ai-mood.js                     # AI 心情查看/编辑
 │   ├── ai-profile.js                  # AI 个人主页（封面/头像/性格）
-│   ├── api-settings.js                # API 配置（厂商 + 图片/地图/音乐 API）
+│   ├── api-settings/                  # API 配置（厂商/功能/语音/第三方）
 │   ├── chat-background.js             # 聊天背景选择（20 色 + 自定义图片）
 │   ├── chat-detail-history.js         # 单会话历史（日历视图）
 │   ├── chat-history.js                # 全局消息搜索
@@ -199,7 +198,6 @@ node voice-server.js
 │   ├── emoji-settings.js              # 表情自动发送设置
 │   ├── group-settings.js              # 群聊设置
 │   ├── log-viewer.js                  # 应用日志查看器
-│   ├── map-debug.js                   # 高德地图接口调试
 │   ├── memory-manage.js               # AI 记忆管理
 │   ├── moment-detail.js               # 朋友圈详情
 │   ├── moment-feed.js                 # 朋友圈全屏版
@@ -232,8 +230,8 @@ node voice-server.js
 │   │   ├── settings.js                # 设置持久化
 │   │   ├── taskDetector.js            # 自然语言任务识别
 │   │   ├── usage.js                   # API 用量追踪
-│   ├── voice.js                   # 系统 TTS 朗读
-│   │   └── voice-call.js            # 语音通话 WebSocket 客户端
+│   │   └── voice.js                   # 系统 TTS 朗读
+│   │   └── voice-call.js              # 语音通话 WebSocket 客户端
 │   ├── components/
 │   │   ├── MusicPlayer.js             # 悬浮迷你播放器（可拖拽）
 │   │   ├── SafeImage.js               # 安全图片组件（失败占位符）
