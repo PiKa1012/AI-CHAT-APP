@@ -172,7 +172,10 @@ export default function AIManageScreen() {
             </View>
             <ScrollView style={styles.modalBody}>
               <Text style={styles.label}>名称 *</Text>
-              <TextInput style={styles.input} value={newAI.name} onChangeText={(text) => setNewAI({ ...newAI, name: text })} placeholder="给AI起个名字" placeholderTextColor="#999" />
+              <TextInput style={styles.input} value={newAI.name} onChangeText={(text) => setNewAI({ ...newAI, name: text })} placeholderTextColor="#999" />
+
+              <Text style={styles.label}>角色设定</Text>
+              <TextInput style={[styles.input, styles.textArea]} value={newAI.description} onChangeText={(text) => setNewAI({ ...newAI, description: text })} placeholderTextColor="#999" multiline numberOfLines={5} />
 
               <TouchableOpacity style={styles.avatarPicker} onPress={() => pickImage(false)}>
                 {newAI.avatar ? (
@@ -185,11 +188,8 @@ export default function AIManageScreen() {
                 )}
               </TouchableOpacity>
 
-              <Text style={styles.label}>角色设定</Text>
-              <TextInput style={[styles.input, styles.textArea]} value={newAI.description} onChangeText={(text) => setNewAI({ ...newAI, description: text })} placeholder="描述这个AI的性格、背景、说话方式等..." placeholderTextColor="#999" multiline numberOfLines={5} />
-
               <Text style={styles.label}>个性签名</Text>
-              <TextInput style={styles.input} value={newAI.signature} onChangeText={(text) => setNewAI({ ...newAI, signature: text })} placeholder="显示在朋友圈等地方..." placeholderTextColor="#999" />
+              <TextInput style={styles.input} value={newAI.signature} onChangeText={(text) => setNewAI({ ...newAI, signature: text })} placeholderTextColor="#999" />
 
               <TouchableOpacity style={styles.submitButton} onPress={handleAdd}>
                 <Text style={styles.submitButtonText}>创建</Text>
@@ -217,7 +217,10 @@ export default function AIManageScreen() {
             {editingAI && (
               <ScrollView style={styles.modalBody}>
                 <Text style={styles.label}>名称 *</Text>
-                <TextInput style={styles.input} value={editingAI.name} onChangeText={(text) => setEditingAI({ ...editingAI, name: text })} placeholder="给AI起个名字" placeholderTextColor="#999" />
+                <TextInput style={styles.input} value={editingAI.name} onChangeText={(text) => setEditingAI({ ...editingAI, name: text })} placeholderTextColor="#999" />
+
+                <Text style={styles.label}>角色设定</Text>
+                <TextInput style={[styles.input, styles.textArea]} value={editingAI.description || ''} onChangeText={(text) => setEditingAI({ ...editingAI, description: text })} placeholderTextColor="#999" multiline numberOfLines={5} />
 
                 <TouchableOpacity style={styles.avatarPicker} onPress={() => pickImage(true)}>
                   {editingAI.avatar && editingAI.avatar.length > 1 ? (
@@ -230,11 +233,8 @@ export default function AIManageScreen() {
                   )}
                 </TouchableOpacity>
 
-                <Text style={styles.label}>角色设定</Text>
-                <TextInput style={[styles.input, styles.textArea]} value={editingAI.description || ''} onChangeText={(text) => setEditingAI({ ...editingAI, description: text })} placeholder="描述这个AI的性格、背景、说话方式等..." placeholderTextColor="#999" multiline numberOfLines={5} />
-
                 <Text style={styles.label}>个性签名</Text>
-                <TextInput style={styles.input} value={editingAI.signature || ''} onChangeText={(text) => setEditingAI({ ...editingAI, signature: text })} placeholder="显示在朋友圈等地方..." placeholderTextColor="#999" />
+                <TextInput style={styles.input} value={editingAI.signature || ''} onChangeText={(text) => setEditingAI({ ...editingAI, signature: text })} placeholderTextColor="#999" />
 
                 <TouchableOpacity style={styles.submitButton} onPress={handleSaveEdit}>
                   <Text style={styles.submitButtonText}>保存</Text>

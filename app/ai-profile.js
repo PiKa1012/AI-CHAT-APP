@@ -21,6 +21,7 @@ export default function AIProfileScreen() {
   const [previewCover, setPreviewCover] = useState(null);
   const [coverBg, setCoverBg] = useState(null);
   const [stats, setStats] = useState({ messages: 0, diaries: 0, days: 0 });
+  const [latestMoment, setLatestMoment] = useState(null);
 
   const ai = aiCharacters.find(a => a.id === parseInt(id));
 
@@ -34,11 +35,14 @@ export default function AIProfileScreen() {
         'SELECT COUNT(*) as c FROM messages WHERE sender_type = ? AND sender_id = ?', ['ai', ai.id]);
       const [diaryRow] = await executeQuery('SELECT COUNT(*) as c FROM diaries WHERE ai_id = ?', [ai.id]);
       const [charRow] = await executeQuery('SELECT created_at FROM ai_characters WHERE id = ?', [ai.id]);
+      const [momentRow] = await executeQuery(
+        'SELECT * FROM moments WHERE author_type = ? AND author_id = ? ORDER BY created_at DESC LIMIT 1', ['ai', ai.id]);
       let days = 0;
       if (charRow?.created_at) {
         days = Math.floor((Date.now() - new Date(charRow.created_at).getTime()) / 86400000);
       }
       setStats({ messages: msgRow?.c || 0, diaries: diaryRow?.c || 0, days });
+      setLatestMoment(momentRow || null);
     } catch (e) {}
   };
 
@@ -129,23 +133,26 @@ export default function AIProfileScreen() {
 
         {ai.description ? (
           <View style={s.card}>
-            <View style={s.cardTitleRow}>
-              <Ionicons name="document-text" size={18} color="#4A90D9" />
-              <Text style={s.cardTitle}>关于 {ai.name}</Text>
-            </View>
             <Text style={s.descText}>{ai.description}</Text>
           </View>
         ) : null}
 
-        <View style={s.card}>
-          <TouchableOpacity style={s.link} onPress={() => router.push({ pathname: '/moment-feed', params: { filterAuthor: ai.id.toString() } })}>
-            <View style={[s.linkIcon, { backgroundColor: '#67C23A15' }]}>
-              <Ionicons name="images" size={20} color="#67C23A" />
-            </View>
-            <Text style={s.linkLabel}>TA 的朋友圈</Text>
-            <Ionicons name="chevron-forward" size={18} color="#ddd" />
-          </TouchableOpacity>
-        </View>
+        {latestMoment ? (
+          <View style={s.card}>
+            <TouchableOpacity style={s.link} onPress={() => router.push({ pathname: '/moment-feed', params: { filterAuthor: ai.id.toString() } })}>
+              <View style={s.linkLeft}>
+                <View style={[s.linkIcon, { backgroundColor: '#67C23A15' }]}>
+                  <Ionicons name="images" size={20} color="#67C23A" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.linkLabel}>最新动态</Text>
+                  <Text style={s.linkSub} numberOfLines={1}>{latestMoment.content || '[图片]'}</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#ddd" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <Modal visible={!!previewCover} transparent onRequestClose={() => setPreviewCover(null)}>
           <TouchableOpacity style={s.previewOverlay} activeOpacity={1} onPress={() => setPreviewCover(null)}>
@@ -205,6 +212,8 @@ const s = StyleSheet.create({
   link: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
   linkIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   linkLabel: { fontSize: 15, color: '#333', flex: 1 },
+  linkSub: { fontSize: 12, color: '#999', marginTop: 2 },
+  linkLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   divider: { height: 1, backgroundColor: '#f5f5f5' },
 
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
