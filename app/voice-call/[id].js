@@ -68,13 +68,8 @@ export default function VoiceCallScreen() {
             setCharAvatar(rawAvatar.length > 1 ? rawAvatar : '');
             charInfoRef.current = {
               name: char.name || 'AI伙伴',
-              personality: char.personality || '',
-              background: char.background || '',
-              age: char.age || '',
-              gender: char.gender || '',
-              likes: char.likes || '',
-              speaking_style: char.speaking_style || '',
-              relationship: char.relationship || '',
+              description: char.description || '',
+              signature: char.signature || '',
             };
           } else {
             setCharName('AI伙伴');

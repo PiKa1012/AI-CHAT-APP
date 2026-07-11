@@ -89,7 +89,7 @@ export default function GroupSettingsScreen() {
           </View>
         )}
         <Text style={styles.memberName}>{ai.name}</Text>
-        <Text style={styles.memberPersonality}>{ai.personality || '友好'}</Text>
+        <Text style={styles.memberPersonality}>{ai.description || ai.signature || ''}</Text>
       </View>
     );
   };

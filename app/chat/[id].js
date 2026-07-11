@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as Crypto from 'expo-crypto';
 import { HmacSHA256, enc } from 'crypto-js';
-import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react';
+import { useEffect, useState, useRef, useCallback, useLayoutEffect, useMemo } from 'react';
 import { loadSetting } from '../../src/services/settings';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -105,14 +105,6 @@ export default function ChatScreen() {
       setVoiceCallEnabled(settings.enableVoiceCall || false);
     })();
   }, []);
-
-  useLayoutEffect(() => {
-    if (conversation) {
-      navigation.setOptions({
-        title: conversation.name || '聊天',
-      });
-    }
-  }, [conversation, navigation]);
 
   useLayoutEffect(() => {
     if (conversation) {
@@ -444,7 +436,7 @@ export default function ChatScreen() {
           return;
         }
       } catch (error) {
-        console.error('检测定时任务失败:', error);
+        console.warn('检测定时任务超时，跳过');
       }
     }
     
@@ -1027,7 +1019,44 @@ export default function ChatScreen() {
     );
   };
 
+  const getBeijingDateLabel = (utcStr) => {
+    const ts = new Date(utcStr).getTime();
+    const bj = new Date(ts + 8 * 3600000);
+    return `${bj.getUTCMonth() + 1}月${bj.getUTCDate()}日`;
+  };
+
+  const messagesWithDates = useMemo(() => {
+    if (!messages.length) return [];
+    const groups = [];
+    let cur = { label: '', msgs: [] };
+    for (const msg of [...messages].reverse()) {
+      const label = getBeijingDateLabel(msg.created_at);
+      if (label !== cur.label) {
+        if (cur.msgs.length > 0) groups.push(cur);
+        cur = { label, msgs: [msg] };
+      } else {
+        cur.msgs.push(msg);
+      }
+    }
+    if (cur.msgs.length > 0) groups.push(cur);
+    const result = [];
+    for (const g of groups) {
+      result.push(...g.msgs);
+      if (g.label) result.push({ type: 'date', label: g.label });
+    }
+    return result;
+  }, [messages]);
+
   const renderMessage = ({ item }) => {
+    if (item.type === 'date') {
+      return (
+        <View style={styles.dateSep}>
+          <View style={styles.dateSepLine} />
+          <Text style={styles.dateSepText}>{item.label}</Text>
+          <View style={styles.dateSepLine} />
+        </View>
+      );
+    }
     const isUser = item.sender_type === 'user';
     const isSpeakingThis = speakingMessageId === item.id;
     const isEmoji = item.message_type === 'emoji';
@@ -1164,7 +1193,7 @@ export default function ChatScreen() {
               />
               <View style={styles.memberInfo}>
                 <Text style={styles.memberName}>{item.name}</Text>
-                <Text style={styles.memberPersonality}>{item.personality || '友好'}</Text>
+                <Text style={styles.memberPersonality}>{item.description || item.signature || ''}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#ccc" />
             </TouchableOpacity>
@@ -1187,7 +1216,7 @@ export default function ChatScreen() {
       
       <FlatList
         ref={flatListRef}
-        data={[...messages].reverse()}
+        data={messagesWithDates}
         inverted
         renderItem={renderMessage}
         keyExtractor={(item, index) => `${item?.id ?? index}-msg-${index}`}

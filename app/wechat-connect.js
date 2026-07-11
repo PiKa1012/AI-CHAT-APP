@@ -209,7 +209,7 @@ export default function WechatConnectScreen() {
                 <SafeAvatar uri={ai.avatar} size={40} name={ai.name || 'A'} color="#4A90D9" />
                 <View style={styles.aiInfo}>
                   <Text style={styles.aiName}>{ai.name}</Text>
-                  <Text style={styles.aiPersonality}>{ai.personality || '友好'}</Text>
+                  <Text style={styles.aiPersonality}>{ai.description || ai.signature || '未设置角色'}</Text>
                 </View>
                 {selectedAI === ai.id && (
                   <Ionicons name="checkmark-circle" size={22} color="#4A90D9" />
@@ -300,14 +300,8 @@ export default function WechatConnectScreen() {
 }
 
 function buildPersonalityPrompt(character) {
-  return `你是${character.name}，性格${character.personality || '友好'}。${character.description || ''}
-${character.age ? `年龄：${character.age}岁` : ''}
-${character.gender ? `性别：${character.gender}` : ''}
-${character.background ? `背景：${character.background}` : ''}
-${character.likes ? `兴趣爱好：${character.likes}` : ''}
-${character.speaking_style ? `说话风格：${character.speaking_style}` : ''}
-${character.relationship ? `与用户的关系：${character.relationship}` : ''}
-请用符合这个性格的方式回复，保持简洁自然，像朋友聊天一样。不要使用emoji。`;
+  return `你是${character.name}。${character.description || ''}${character.signature ? '\n个性签名：' + character.signature : ''}
+请保持简洁自然，像朋友聊天一样。不要使用emoji。`;
 }
 
 function getDefaultBaseUrl(provider) {

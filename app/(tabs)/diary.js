@@ -222,7 +222,7 @@ export default function DiaryScreen() {
                 <SafeAvatar uri={ai.avatar} size={40} name={ai.name?.[0] || 'A'} color="#4A90D9" />
                 <View style={styles.sheetInfo}>
                   <Text style={[styles.sheetName, selectedAI?.id === ai.id && styles.sheetNameActive]}>{ai.name}</Text>
-                  <Text style={styles.sheetMeta}>{ai.personality || '友好'}</Text>
+                  <Text style={styles.sheetMeta}>{ai.description || ai.signature || ''}</Text>
                 </View>
                 {selectedAI?.id === ai.id && <Ionicons name="checkmark" size={20} color="#4A90D9" />}
               </TouchableOpacity>

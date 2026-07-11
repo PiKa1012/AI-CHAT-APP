@@ -38,17 +38,11 @@ class CallSession {
     // 角色设定
     if (this.charInfo) {
       const parts = [];
-      // AI 角色信息
       const aiParts = [];
       if (this.charInfo.name) aiParts.push(`你是${this.charInfo.name}`);
-      if (this.charInfo.age) aiParts.push(`${this.charInfo.age}岁`);
-      if (this.charInfo.gender) aiParts.push(this.charInfo.gender);
-      if (this.charInfo.personality) aiParts.push(`性格${this.charInfo.personality}`);
-      if (this.charInfo.background) aiParts.push(`背景：${this.charInfo.background}`);
-      if (this.charInfo.speaking_style) aiParts.push(`说话风格：${this.charInfo.speaking_style}`);
-      if (this.charInfo.likes) aiParts.push(`喜好：${this.charInfo.likes}`);
-      if (this.charInfo.relationship) aiParts.push(`与用户的关系：${this.charInfo.relationship}`);
-      if (aiParts.length > 0) parts.push(aiParts.join('，'));
+      if (this.charInfo.description) aiParts.push(this.charInfo.description);
+      if (this.charInfo.signature) aiParts.push(`个性签名：${this.charInfo.signature}`);
+      if (aiParts.length > 0) parts.push(aiParts.join('。'));
 
       // 用户信息
       const userParts = [];
@@ -287,15 +281,12 @@ class CallSession {
       .replace(/\n{3,}/g, '\n')
       .trim();
 
-    if (/^(你是|性格|当前时间|请以|我的名字是|用户的名字是|回复要符合)/.test(reply)) {
+    if (/^(你是|当前时间|请以|回复要符合)/.test(reply)) {
       reply = reply.replace(/^你[^\n]*\n?/, '')
-        .replace(/^性格[^\n]*\n?/, '')
         .replace(/^当前时间[^\n]*\n?/, '')
         .replace(/^请以[^\n]*\n?/, '')
-        .replace(/^我的名字[^\n]*\n?/, '')
-        .replace(/^用户的名字[^\n]*\n?/, '')
-        .replace(/^回复要符合[^\n]*\n?/, '')
         .replace(/^不要使用[^\n]*\n?/g, '')
+        .replace(/^请用符合[^\n]*\n?/g, '')
         .replace(/^请用符合[^\n]*\n?/g, '')
         .trim();
     }

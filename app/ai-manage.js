@@ -9,11 +9,6 @@ import { SafeAvatar } from '../src/components/SafeImage';
 import { copyToAppStorage } from '../src/services/media';
 import { executeQuery } from '../src/database';
 
-const PERSONALITIES = ['友好', '可爱', '高冷', '幽默', '温柔', '傲娇', '元气', '成熟'];
-const VOICES = ['默认', '甜美', '磁性', '可爱', '成熟'];
-const GENDERS = ['男', '女', '其他'];
-const RELATIONSHIPS = ['朋友', '恋人', '家人', '老师', '同事'];
-
 export default function AIManageScreen() {
   const router = useRouter();
   const aiCharacters = useAppStore(s => s.aiCharacters);
@@ -25,17 +20,9 @@ export default function AIManageScreen() {
   const [editingAI, setEditingAI] = useState(null);
   const [newAI, setNewAI] = useState({
     name: '',
-    personality: '友好',
-    description: '',
-    voice_id: '默认',
     avatar: null,
-    age: '',
-    gender: '',
-    background: '',
-    likes: '',
-    speaking_style: '',
-    relationship: '朋友',
-    greeting: '',
+    description: '',
+    signature: '',
   });
 
   const pickImage = async (isEdit = false) => {
@@ -70,22 +57,14 @@ export default function AIManageScreen() {
     await addAICharacter({
       ...newAI,
       avatar: newAI.avatar || newAI.name[0],
-      age: newAI.age ? parseInt(newAI.age) : null,
     });
-    setNewAI({ 
-      name: '', personality: '友好', description: '', voice_id: '默认', avatar: null,
-      age: '', gender: '', background: '', likes: '', speaking_style: '', relationship: '朋友', greeting: ''
-    });
+    setNewAI({ name: '', avatar: null, description: '', signature: '' });
     setModalVisible(false);
     Alert.alert('成功', 'AI角色创建成功！');
   };
 
   const handleEdit = (ai) => {
-    setEditingAI({
-      ...ai,
-      personality: ai.personality || '友好',
-      voice_id: ai.voice_id || '默认',
-    });
+    setEditingAI({ ...ai });
     setEditModalVisible(true);
   };
 
@@ -102,17 +81,9 @@ export default function AIManageScreen() {
     }
     await updateAICharacter(editingAI.id, {
       name: editingAI.name,
-      personality: editingAI.personality,
       description: editingAI.description,
-      voice_id: editingAI.voice_id,
+      signature: editingAI.signature,
       avatar: editingAI.avatar || editingAI.name[0],
-      age: editingAI.age ? parseInt(editingAI.age) : null,
-      gender: editingAI.gender,
-      background: editingAI.background,
-      likes: editingAI.likes,
-      speaking_style: editingAI.speaking_style,
-      relationship: editingAI.relationship,
-      greeting: editingAI.greeting,
     });
     setEditModalVisible(false);
     setEditingAI(null);
@@ -139,22 +110,10 @@ export default function AIManageScreen() {
         color={getAvatarColor(item.id)}
       />
       <View style={styles.aiInfo}>
-        <View style={styles.aiNameRow}>
-          <Text style={styles.aiName}>{item.name}</Text>
-          {item.gender && (
-            <View style={styles.genderBadge}>
-              <Text style={styles.genderText}>{item.gender}</Text>
-            </View>
-          )}
-          {item.age && (
-            <Text style={styles.aiAge}>{item.age}岁</Text>
-          )}
-        </View>
-        <Text style={styles.aiPersonality}>性格：{item.personality || '友好'}</Text>
-        {item.relationship && (
-          <Text style={styles.aiRelationship}>关系：{item.relationship}</Text>
-        )}
-        {item.description ? (
+        <Text style={styles.aiName}>{item.name}</Text>
+        {item.signature ? (
+          <Text style={styles.aiDescription} numberOfLines={1}>{item.signature}</Text>
+        ) : item.description ? (
           <Text style={styles.aiDescription} numberOfLines={1}>{item.description}</Text>
         ) : null}
       </View>
@@ -173,38 +132,6 @@ export default function AIManageScreen() {
     const colors = ['#4A90D9', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#9B59B6', '#1ABC9C', '#E74C3C'];
     return colors[(id - 1) % colors.length];
   };
-
-  const renderPersonalitySelector = (selected, onSelect) => (
-    <View style={styles.personalityContainer}>
-      {PERSONALITIES.map(p => (
-        <TouchableOpacity
-          key={p}
-          style={[styles.personalityTag, selected === p && styles.personalityTagSelected]}
-          onPress={() => onSelect(p)}
-        >
-          <Text style={[styles.personalityTagText, selected === p && styles.personalityTagTextSelected]}>
-            {p}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderVoiceSelector = (selected, onSelect) => (
-    <View style={styles.personalityContainer}>
-      {VOICES.map(v => (
-        <TouchableOpacity
-          key={v}
-          style={[styles.personalityTag, selected === v && styles.personalityTagSelected]}
-          onPress={() => onSelect(v)}
-        >
-          <Text style={[styles.personalityTagText, selected === v && styles.personalityTagTextSelected]}>
-            {v}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
 
   return (
     <View style={styles.container}>
@@ -244,6 +171,9 @@ export default function AIManageScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.modalBody}>
+              <Text style={styles.label}>名称 *</Text>
+              <TextInput style={styles.input} value={newAI.name} onChangeText={(text) => setNewAI({ ...newAI, name: text })} placeholder="给AI起个名字" placeholderTextColor="#999" />
+
               <TouchableOpacity style={styles.avatarPicker} onPress={() => pickImage(false)}>
                 {newAI.avatar ? (
                   <Image source={{ uri: newAI.avatar }} style={styles.avatarPreview} />
@@ -255,109 +185,11 @@ export default function AIManageScreen() {
                 )}
               </TouchableOpacity>
 
-              <Text style={styles.label}>名称 *</Text>
-              <TextInput
-                style={styles.input}
-                value={newAI.name}
-                onChangeText={(text) => setNewAI({ ...newAI, name: text })}
-                placeholder="给AI起个名字"
-                placeholderTextColor="#999"
-              />
+              <Text style={styles.label}>角色设定</Text>
+              <TextInput style={[styles.input, styles.textArea]} value={newAI.description} onChangeText={(text) => setNewAI({ ...newAI, description: text })} placeholder="描述这个AI的性格、背景、说话方式等..." placeholderTextColor="#999" multiline numberOfLines={5} />
 
-              <Text style={styles.label}>年龄</Text>
-              <TextInput
-                style={styles.input}
-                value={newAI.age}
-                onChangeText={(text) => setNewAI({ ...newAI, age: text })}
-                placeholder="输入年龄"
-                placeholderTextColor="#999"
-                keyboardType="numeric"
-              />
-
-              <Text style={styles.label}>性别</Text>
-              <View style={styles.personalityContainer}>
-                {GENDERS.map(g => (
-                  <TouchableOpacity
-                    key={g}
-                    style={[styles.personalityTag, newAI.gender === g && styles.personalityTagSelected]}
-                    onPress={() => setNewAI({ ...newAI, gender: g })}
-                  >
-                    <Text style={[styles.personalityTagText, newAI.gender === g && styles.personalityTagTextSelected]}>
-                      {g}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.label}>性格</Text>
-              {renderPersonalitySelector(newAI.personality, (p) => setNewAI({ ...newAI, personality: p }))}
-
-              <Text style={styles.label}>与你的关系</Text>
-              <View style={styles.personalityContainer}>
-                {RELATIONSHIPS.map(r => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.personalityTag, newAI.relationship === r && styles.personalityTagSelected]}
-                    onPress={() => setNewAI({ ...newAI, relationship: r })}
-                  >
-                    <Text style={[styles.personalityTagText, newAI.relationship === r && styles.personalityTagTextSelected]}>
-                      {r}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.label}>声音</Text>
-              {renderVoiceSelector(newAI.voice_id, (v) => setNewAI({ ...newAI, voice_id: v }))}
-
-              <Text style={styles.label}>说话风格</Text>
-              <TextInput
-                style={styles.input}
-                value={newAI.speaking_style}
-                onChangeText={(text) => setNewAI({ ...newAI, speaking_style: text })}
-                placeholder="如：温柔、活泼、成熟稳重..."
-                placeholderTextColor="#999"
-              />
-
-              <Text style={styles.label}>打招呼语</Text>
-              <TextInput
-                style={styles.input}
-                value={newAI.greeting}
-                onChangeText={(text) => setNewAI({ ...newAI, greeting: text })}
-                placeholder="第一次见面时说的话..."
-                placeholderTextColor="#999"
-              />
-
-              <Text style={styles.label}>兴趣爱好</Text>
-              <TextInput
-                style={styles.input}
-                value={newAI.likes}
-                onChangeText={(text) => setNewAI({ ...newAI, likes: text })}
-                placeholder="如：看书、听音乐、玩游戏..."
-                placeholderTextColor="#999"
-              />
-
-              <Text style={styles.label}>背景故事</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={newAI.background}
-                onChangeText={(text) => setNewAI({ ...newAI, background: text })}
-                placeholder="AI的背景故事..."
-                placeholderTextColor="#999"
-                multiline
-                numberOfLines={3}
-              />
-
-              <Text style={styles.label}>描述</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={newAI.description}
-                onChangeText={(text) => setNewAI({ ...newAI, description: text })}
-                placeholder="描述一下这个AI..."
-                placeholderTextColor="#999"
-                multiline
-                numberOfLines={3}
-              />
+              <Text style={styles.label}>个性签名</Text>
+              <TextInput style={styles.input} value={newAI.signature} onChangeText={(text) => setNewAI({ ...newAI, signature: text })} placeholder="显示在朋友圈等地方..." placeholderTextColor="#999" />
 
               <TouchableOpacity style={styles.submitButton} onPress={handleAdd}>
                 <Text style={styles.submitButtonText}>创建</Text>
@@ -384,6 +216,9 @@ export default function AIManageScreen() {
             </View>
             {editingAI && (
               <ScrollView style={styles.modalBody}>
+                <Text style={styles.label}>名称 *</Text>
+                <TextInput style={styles.input} value={editingAI.name} onChangeText={(text) => setEditingAI({ ...editingAI, name: text })} placeholder="给AI起个名字" placeholderTextColor="#999" />
+
                 <TouchableOpacity style={styles.avatarPicker} onPress={() => pickImage(true)}>
                   {editingAI.avatar && editingAI.avatar.length > 1 ? (
                     <Image source={{ uri: editingAI.avatar }} style={styles.avatarPreview} />
@@ -395,109 +230,11 @@ export default function AIManageScreen() {
                   )}
                 </TouchableOpacity>
 
-                <Text style={styles.label}>名称 *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editingAI.name}
-                  onChangeText={(text) => setEditingAI({ ...editingAI, name: text })}
-                  placeholder="给AI起个名字"
-                  placeholderTextColor="#999"
-                />
+                <Text style={styles.label}>角色设定</Text>
+                <TextInput style={[styles.input, styles.textArea]} value={editingAI.description || ''} onChangeText={(text) => setEditingAI({ ...editingAI, description: text })} placeholder="描述这个AI的性格、背景、说话方式等..." placeholderTextColor="#999" multiline numberOfLines={5} />
 
-                <Text style={styles.label}>年龄</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editingAI.age?.toString() || ''}
-                  onChangeText={(text) => setEditingAI({ ...editingAI, age: text })}
-                  placeholder="输入年龄"
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                />
-
-                <Text style={styles.label}>性别</Text>
-                <View style={styles.personalityContainer}>
-                  {GENDERS.map(g => (
-                    <TouchableOpacity
-                      key={g}
-                      style={[styles.personalityTag, editingAI.gender === g && styles.personalityTagSelected]}
-                      onPress={() => setEditingAI({ ...editingAI, gender: g })}
-                    >
-                      <Text style={[styles.personalityTagText, editingAI.gender === g && styles.personalityTagTextSelected]}>
-                        {g}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.label}>性格</Text>
-                {renderPersonalitySelector(editingAI.personality, (p) => setEditingAI({ ...editingAI, personality: p }))}
-
-                <Text style={styles.label}>与你的关系</Text>
-                <View style={styles.personalityContainer}>
-                  {RELATIONSHIPS.map(r => (
-                    <TouchableOpacity
-                      key={r}
-                      style={[styles.personalityTag, editingAI.relationship === r && styles.personalityTagSelected]}
-                      onPress={() => setEditingAI({ ...editingAI, relationship: r })}
-                    >
-                      <Text style={[styles.personalityTagText, editingAI.relationship === r && styles.personalityTagTextSelected]}>
-                        {r}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.label}>声音</Text>
-                {renderVoiceSelector(editingAI.voice_id, (v) => setEditingAI({ ...editingAI, voice_id: v }))}
-
-                <Text style={styles.label}>说话风格</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editingAI.speaking_style || ''}
-                  onChangeText={(text) => setEditingAI({ ...editingAI, speaking_style: text })}
-                  placeholder="如：温柔、活泼、成熟稳重..."
-                  placeholderTextColor="#999"
-                />
-
-                <Text style={styles.label}>打招呼语</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editingAI.greeting || ''}
-                  onChangeText={(text) => setEditingAI({ ...editingAI, greeting: text })}
-                  placeholder="第一次见面时说的话..."
-                  placeholderTextColor="#999"
-                />
-
-                <Text style={styles.label}>兴趣爱好</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editingAI.likes || ''}
-                  onChangeText={(text) => setEditingAI({ ...editingAI, likes: text })}
-                  placeholder="如：看书、听音乐、玩游戏..."
-                  placeholderTextColor="#999"
-                />
-
-                <Text style={styles.label}>背景故事</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={editingAI.background || ''}
-                  onChangeText={(text) => setEditingAI({ ...editingAI, background: text })}
-                  placeholder="AI的背景故事..."
-                  placeholderTextColor="#999"
-                  multiline
-                  numberOfLines={3}
-                />
-
-                <Text style={styles.label}>描述</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={editingAI.description}
-                  onChangeText={(text) => setEditingAI({ ...editingAI, description: text })}
-                  placeholder="描述一下这个AI..."
-                  placeholderTextColor="#999"
-                  multiline
-                  numberOfLines={3}
-                />
+                <Text style={styles.label}>个性签名</Text>
+                <TextInput style={styles.input} value={editingAI.signature || ''} onChangeText={(text) => setEditingAI({ ...editingAI, signature: text })} placeholder="显示在朋友圈等地方..." placeholderTextColor="#999" />
 
                 <TouchableOpacity style={styles.submitButton} onPress={handleSaveEdit}>
                   <Text style={styles.submitButtonText}>保存</Text>
@@ -540,39 +277,10 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
   },
-  aiNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   aiName: {
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
-  },
-  genderBadge: {
-    backgroundColor: '#FFE6F0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  genderText: {
-    fontSize: 12,
-    color: '#FF69B4',
-  },
-  aiAge: {
-    fontSize: 13,
-    color: '#666',
-  },
-  aiPersonality: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 2,
-  },
-  aiRelationship: {
-    fontSize: 12,
-    color: '#4A90D9',
-    marginTop: 2,
   },
   aiDescription: {
     fontSize: 12,
@@ -664,30 +372,6 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
-  },
-  personalityContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  personalityTag: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  personalityTagSelected: {
-    backgroundColor: '#4A90D9',
-    borderColor: '#4A90D9',
-  },
-  personalityTagText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  personalityTagTextSelected: {
-    color: '#fff',
   },
   submitButton: {
     backgroundColor: '#4A90D9',

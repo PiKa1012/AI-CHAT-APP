@@ -120,6 +120,22 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     color: '#999',
   },
+  dateSep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 10,
+  },
+  dateSepLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dateSepText: {
+    fontSize: 12,
+    color: '#bbb',
+  },
   userMessageTime: {
     color: 'rgba(255,255,255,0.7)',
   },

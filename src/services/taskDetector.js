@@ -90,7 +90,7 @@ export async function detectAndCreateTask(aiId, userMessage) {
       }
     }
   } catch (error) {
-    console.error('检测定时任务失败:', error);
+    console.warn('检测定时任务超时，跳过');
   }
   
   return null;

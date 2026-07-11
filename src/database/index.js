@@ -37,6 +37,7 @@ async function initDatabase(database) {
       speaking_style TEXT,
       relationship TEXT,
       greeting TEXT,
+      signature TEXT,
       coverBg TEXT
     );
 
@@ -202,6 +203,7 @@ async function initDatabase(database) {
   `);
 
   try { await database.execAsync('ALTER TABLE api_usage ADD COLUMN cached_tokens INTEGER DEFAULT 0'); } catch (e) { /* 列可能已存在，忽略 */ }
+  try { await database.execAsync('ALTER TABLE ai_characters ADD COLUMN signature TEXT'); } catch (e) { /* 列可能已存在，忽略 */ }
   // 一次性迁移：旧日记 created_at 为北京时间，改为 UTC
   try {
     const migrated = await database.getAllAsync("SELECT value FROM user_settings WHERE key = 'diary_tz_migrated'");

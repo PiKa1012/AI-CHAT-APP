@@ -97,14 +97,14 @@ export async function analyzeAndUpdateMood(aiId, userMessage, aiResponse, charac
 }
 
 async function analyzeEmotionWithLLM(character, currentMood, userMessage, aiResponse) {
-  const personality = character.personality || '友好';
   const name = character.name;
+  const description = character.description || '';
 
   const prompt = `分析以下对话中AI的情绪变化。
 
 AI信息：
 - 名字：${name}
-- 性格：${personality}
+- 设定：${description}
 - 当前情绪：${currentMood.mood}，精力${currentMood.energy}，好感${currentMood.affection}，压力${currentMood.stress}，自信${currentMood.confidence}
 
 对话：

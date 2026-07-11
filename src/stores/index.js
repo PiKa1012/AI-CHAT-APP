@@ -21,11 +21,11 @@ export const useAppStore = create((set, get) => ({
     const maxIdResult = await executeQuery('SELECT COALESCE(MAX(id), 9999) + 1 as nextId FROM ai_characters');
     const nextId = Math.max(maxIdResult[0]?.nextId || 10000, 10000);
     const id = await executeInsert(
-      `INSERT INTO ai_characters (id, name, avatar, personality, description, voice_id, age, gender, background, likes, speaking_style, relationship, greeting) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ai_characters (id, name, avatar, personality, description, voice_id, age, gender, background, likes, speaking_style, relationship, greeting, signature) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [nextId, character.name, character.avatar, character.personality, character.description, character.voice_id,
        character.age, character.gender, character.background, character.likes, character.speaking_style, 
-       character.relationship, character.greeting]
+       character.relationship, character.greeting, character.signature]
     );
     const newCharacter = { id: nextId, ...character, is_active: 1 };
     set((state) => ({ aiCharacters: [...state.aiCharacters, newCharacter] }));
@@ -417,8 +417,8 @@ export const useAppStore = create((set, get) => ({
 
       for (const char of data.aiCharacters || []) {
         await executeInsert(
-          'INSERT INTO ai_characters (id, name, avatar, personality, description, voice_id, age, gender, background, likes, speaking_style, relationship, greeting, coverBg, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [char.id, char.name, char.avatar, char.personality, char.description, char.voice_id, char.age, char.gender, char.background, char.likes, char.speaking_style, char.relationship, char.greeting, char.coverBg, char.is_active]
+          'INSERT INTO ai_characters (id, name, avatar, personality, description, voice_id, age, gender, background, likes, speaking_style, relationship, greeting, signature, coverBg, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [char.id, char.name, char.avatar, char.personality, char.description, char.voice_id, char.age, char.gender, char.background, char.likes, char.speaking_style, char.relationship, char.greeting, char.signature, char.coverBg, char.is_active]
         );
       }
       for (const conv of data.conversations || []) {

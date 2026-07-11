@@ -91,28 +91,15 @@ async function getUserInfoPrompt() {
 }
 
 export function getPersonalityPrompt(character) {
-  const personality = character.personality || '友好';
   const name = character.name;
   const desc = character.description || '';
+  const signature = character.signature ? `\n个性签名：${character.signature}` : '';
   const timeInfo = getCurrentTimeInfo();
-  const age = character.age ? `年龄：${character.age}岁` : '';
-  const gender = character.gender ? `性别：${character.gender}` : '';
-  const background = character.background ? `背景：${character.background}` : '';
-  const likes = character.likes ? `兴趣爱好：${character.likes}` : '';
-  const speakingStyle = character.speaking_style ? `说话风格：${character.speaking_style}` : '';
-  const relationship = character.relationship ? `与用户的关系：${character.relationship}` : '';
   
-  return `你是${name}，性格${personality}。${desc}
-${age}
-${gender}
-${background}
-${likes}
-${speakingStyle}
-${relationship}
+  return `你是${name}。${desc}${signature}
 当前时间：${timeInfo.full}（${timeInfo.period}）
-请用符合这个性格的方式回复，保持简洁自然，像朋友聊天一样。
-不要使用emoji，不要过度热情，保持自然的对话语气。
-回复要符合当前时间的语境。`;
+请用符合以上设定的方式回复，保持简洁自然，像朋友聊天一样。
+不要使用emoji，不要过度热情，保持自然的对话语气。`;
 }
 
 export function sanitizeAIOutput(text) {
@@ -120,23 +107,12 @@ export function sanitizeAIOutput(text) {
 
   let cleaned = text
     .replace(/```[\s\S]*?```/g, '')
-    .replace(/^你是[^，,\n]{0,30}，[^\n]*\n?/gm, '')
-    .replace(/^性格[^\n]*\n?/gm, '')
-    .replace(/^年龄[^\n]*\n?/gm, '')
-    .replace(/^性别[^\n]*\n?/gm, '')
-    .replace(/^背景[^\n]*\n?/gm, '')
-    .replace(/^兴趣爱好[^\n]*\n?/gm, '')
-    .replace(/^说话风格[^\n]*\n?/gm, '')
-    .replace(/^与用户的关系[^\n]*\n?/gm, '')
     .replace(/^当前时间[^\n]*\n?/gm, '')
     .replace(/^请用符合[^\n]*\n?/gm, '')
     .replace(/^不要使用[^\n]*\n?/gm, '')
-    .replace(/^回复要符合[^\n]*\n?/gm, '')
-    .replace(/^我的名字是[^\n]*\n?/gm, '')
-    .replace(/^用户的名字是[^\n]*\n?/gm, '')
     .replace(/^你是一个[^\n]*\n?/gm, '')
-    .replace(/^system[：:][^\n]*\n?/gim, '')
-    .replace(/^(?:system prompt|提示词|prompt)[^\n]*\n?/gim, '')
+    .replace(/^个性签名[^\n]*\n?/gm, '')
+    .replace(/^你是[^，,\n]{0,30}[^\n]*\n?/gm, '')
     .replace(/\n{3,}/g, '\n')
     .trim();
 

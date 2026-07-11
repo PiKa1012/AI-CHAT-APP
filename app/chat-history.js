@@ -1,19 +1,32 @@
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, Image } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAppStore } from '../src/stores';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { formatTime, formatDate } from '../src/utils/time';
+import { loadSetting } from '../src/services/settings';
 
 export default function ChatHistoryScreen() {
   const router = useRouter();
-  const conversations = useAppStore(s => s.conversations);
   const aiCharacters = useAppStore(s => s.aiCharacters);
   const searchAllMessages = useAppStore(s => s.searchAllMessages);
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [userProfile, setUserProfile] = useState({});
+
+  useFocusEffect(useCallback(() => {
+    (async () => {
+      const p = await loadSetting('user_profile', {});
+      setUserProfile(p);
+    })();
+  }, []));
+
+  const getConvName = (item) => {
+    if (item.conversation_name) return item.conversation_name;
+    return item.conversation_type === 'group' ? '群聊' : '私聊';
+  };
 
   const handleSearch = async () => {
     if (!searchText.trim()) {
@@ -26,7 +39,6 @@ export default function ChatHistoryScreen() {
       const results = await searchAllMessages(searchText.trim());
       setSearchResults(results);
     } catch (error) {
-      console.error('搜索失败:', error);
       Alert.alert('错误', '搜索失败');
     }
     setIsSearching(false);
@@ -34,54 +46,59 @@ export default function ChatHistoryScreen() {
 
   const highlightText = (text, keyword) => {
     if (!keyword) return <Text>{text}</Text>;
-    
-    const parts = text.split(new RegExp(`(${keyword})`, 'gi'));
+    const parts = text.split(new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
     return (
       <Text>
-        {parts.map((part, index) => 
-          part.toLowerCase() === keyword.toLowerCase() ? (
-            <Text key={index} style={styles.highlight}>{part}</Text>
-          ) : (
-            <Text key={index}>{part}</Text>
-          )
+        {parts.map((part, i) =>
+          part.toLowerCase() === keyword.toLowerCase()
+            ? <Text key={i} style={s.highlight}>{part}</Text>
+            : <Text key={i}>{part}</Text>
         )}
       </Text>
     );
   };
 
+  const getSenderName = (item) => {
+    if (item.sender_type === 'user') return userProfile.name || '你';
+    return item.sender_name || 'AI';
+  };
+
   const renderResultItem = ({ item }) => {
     const ai = aiCharacters.find(a => a.id === item.sender_id);
-    const avatarName = item.sender_type === 'user' ? '我' : (ai?.name?.[0] || 'A');
+    const senderName = getSenderName(item);
     const isUser = item.sender_type === 'user';
 
     return (
-      <TouchableOpacity 
-        style={styles.resultItem}
-        onPress={() => router.push(`/chat/${item.conversation_id}`)}
-      >
-        <View style={styles.resultHeader}>
-          <View style={styles.conversationInfo}>
-            <Ionicons 
-              name={item.conversation_type === 'group' ? 'people' : 'chatbubble'} 
-              size={14} 
-              color="#999" 
-            />
-            <Text style={styles.conversationName} numberOfLines={1}>
-              {item.conversation_name}
-            </Text>
+      <TouchableOpacity style={s.card} onPress={() => router.push(`/chat/${item.conversation_id}`)}>
+        <View style={s.cardHeader}>
+          <View style={s.convBadge}>
+            <Ionicons name={item.conversation_type === 'group' ? 'people' : 'chatbubble'} size={11} color="#4A90D9" />
+            <Text style={s.convBadgeText} numberOfLines={1}>{getConvName(item)}</Text>
           </View>
-          <Text style={styles.resultTime}>
+          <Text style={s.time}>
             {formatDate(item.created_at)} {formatTime(item.created_at)}
           </Text>
         </View>
-        
-        <View style={styles.resultContent}>
-          <View style={[styles.avatar, isUser ? styles.userAvatar : styles.aiAvatar]}>
-            <Text style={styles.avatarText}>{avatarName}</Text>
-          </View>
-          <View style={styles.messagePreview}>
-            <Text style={styles.senderName}>{item.sender_name}</Text>
-            <Text style={styles.messageText} numberOfLines={2}>
+
+        <View style={s.cardBody}>
+          {isUser ? (
+            userProfile.avatar ? (
+              <Image source={{ uri: userProfile.avatar }} style={s.avatar} />
+            ) : (
+              <View style={[s.avatar, s.userAvatar]}>
+                <Ionicons name="person" size={18} color="#fff" />
+              </View>
+            )
+          ) : ai?.avatar && ai.avatar.length > 1 ? (
+            <Image source={{ uri: ai.avatar }} style={s.avatar} />
+          ) : (
+            <View style={[s.avatar, s.aiAvatar]}>
+              <Text style={s.avatarText}>{ai?.name?.[0] || 'A'}</Text>
+            </View>
+          )}
+          <View style={s.msgContent}>
+            <Text style={s.senderName}>{senderName}</Text>
+            <Text style={s.msgText} numberOfLines={2}>
               {highlightText(item.content, searchText)}
             </Text>
           </View>
@@ -90,203 +107,93 @@ export default function ChatHistoryScreen() {
     );
   };
 
-  const renderEmpty = () => {
-    if (!hasSearched) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="search-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>搜索聊天记录</Text>
-          <Text style={styles.emptySubText}>输入关键词搜索所有聊天内容</Text>
-        </View>
-      );
-    }
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="document-text-outline" size={64} color="#ccc" />
-        <Text style={styles.emptyText}>未找到相关记录</Text>
-        <Text style={styles.emptySubText}>试试其他关键词</Text>
-      </View>
-    );
-  };
-
   return (
-    <View style={styles.container}>
-      <View style={styles.searchBar}>
-        <View style={styles.searchInputContainer}>
-          <Ionicons name="search" size={20} color="#999" />
+    <View style={s.ctn}>
+      <View style={s.searchWrap}>
+        <View style={s.searchBox}>
+          <Ionicons name="search" size={18} color="#999" />
           <TextInput
-            style={styles.searchInput}
+            style={s.searchInput}
             value={searchText}
             onChangeText={setSearchText}
-            placeholder="搜索聊天记录..."
+            placeholder="输入关键词搜索..."
             placeholderTextColor="#999"
             returnKeyType="search"
             onSubmitEditing={handleSearch}
+            autoFocus
           />
           {searchText.length > 0 && (
             <TouchableOpacity onPress={() => { setSearchText(''); setSearchResults([]); setHasSearched(false); }}>
-              <Ionicons name="close-circle" size={20} color="#999" />
+              <Ionicons name="close-circle" size={18} color="#999" />
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
-          <Text style={styles.searchButtonText}>搜索</Text>
-        </TouchableOpacity>
       </View>
 
       {isSearching ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>搜索中...</Text>
+        <View style={s.centered}>
+          <Text style={s.loadingText}>搜索中...</Text>
+        </View>
+      ) : !hasSearched ? (
+        <View style={s.centered}>
+          <View style={s.emptyIcon}>
+            <Ionicons name="search-outline" size={40} color="#ccc" />
+          </View>
+          <Text style={s.emptyTitle}>搜索聊天记录</Text>
+          <Text style={s.emptySub}>输入关键词，查找所有对话中的内容</Text>
+        </View>
+      ) : searchResults.length === 0 ? (
+        <View style={s.centered}>
+          <View style={s.emptyIcon}>
+            <Ionicons name="document-text-outline" size={40} color="#ccc" />
+          </View>
+          <Text style={s.emptyTitle}>未找到相关记录</Text>
+          <Text style={s.emptySub}>试试其他关键词</Text>
         </View>
       ) : (
         <FlatList
           data={searchResults}
           renderItem={renderResultItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.resultsList}
-          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={s.list}
         />
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
+const s = StyleSheet.create({
+  ctn: { flex: 1, backgroundColor: '#f5f5f5' },
+  searchWrap: { padding: 12, backgroundColor: '#fff' },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#f0f0f0', borderRadius: 10, paddingHorizontal: 12, gap: 8,
   },
-  searchBar: {
-    flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    gap: 10,
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 15, color: '#333' },
+
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 80 },
+  emptyIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: 16, color: '#666', fontWeight: '500' },
+  emptySub: { fontSize: 13, color: '#999', marginTop: 6 },
+
+  list: { padding: 12 },
+  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  convBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#4A90D910', paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: 6, gap: 4,
   },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#333',
-  },
-  searchButton: {
-    backgroundColor: '#4A90D9',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  searchButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 15,
-    color: '#999',
-  },
-  resultsList: {
-    padding: 12,
-  },
-  resultItem: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  conversationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 6,
-  },
-  conversationName: {
-    fontSize: 13,
-    color: '#666',
-    flex: 1,
-  },
-  resultTime: {
-    fontSize: 12,
-    color: '#999',
-  },
-  resultContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  userAvatar: {
-    backgroundColor: '#67C23A',
-  },
-  aiAvatar: {
-    backgroundColor: '#4A90D9',
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  messagePreview: {
-    flex: 1,
-  },
-  senderName: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 4,
-  },
-  messageText: {
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
-  },
-  highlight: {
-    backgroundColor: '#FFE66D',
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#999',
-    marginTop: 16,
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#ccc',
-    marginTop: 8,
-  },
+  convBadgeText: { fontSize: 12, color: '#4A90D9', maxWidth: 160 },
+  time: { fontSize: 12, color: '#bbb' },
+  cardBody: { flexDirection: 'row', alignItems: 'flex-start' },
+  avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
+  userAvatar: { backgroundColor: '#67C23A', justifyContent: 'center', alignItems: 'center' },
+  aiAvatar: { backgroundColor: '#4A90D9', justifyContent: 'center', alignItems: 'center' },
+  avatarText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  msgContent: { flex: 1 },
+  senderName: { fontSize: 13, color: '#666', marginBottom: 3 },
+  msgText: { fontSize: 15, color: '#333', lineHeight: 22 },
+  highlight: { backgroundColor: '#FFE66D', fontWeight: '500' },
+  loadingText: { fontSize: 15, color: '#999' },
 });

@@ -231,7 +231,6 @@ async function callAI(text) {
   const reply = raw
     ? raw.replace(/```[\s\S]*?```/g, '')
         .replace(/^你是[^\n]*\n?/gm, '')
-        .replace(/^性格[^\n]*\n?/gm, '')
         .replace(/^当前时间[^\n]*\n?/gm, '')
         .replace(/^请用符合[^\n]*\n?/gm, '')
         .replace(/^不要使用[^\n]*\n?/gm, '')

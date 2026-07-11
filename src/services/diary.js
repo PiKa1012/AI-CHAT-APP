@@ -73,7 +73,7 @@ export async function generateDiary(aiId, style = 'normal') {
     avoidRepeat = `\n你上次写的日记标题是"${lastDiary[0].title}"，这次请写完全不同的内容。\n`;
   }
 
-  const prompt = `你是${character.name}，性格${character.personality || '友好'}。${character.description || ''}
+  const prompt = `你是${character.name}。${character.description || ''}
 
 今天是${timeInfo.full}，现在是${timeInfo.hour}点。
 
@@ -239,7 +239,7 @@ export async function aiReplyToDiaryComment(diaryId, userComment) {
     const userProfile = await loadSetting('user_profile', {});
     const userName = userProfile.name || '你';
 
-    const prompt = `你是${character.name}，性格${character.personality || '友好'}。${character.description || ''}
+    const prompt = `你是${character.name}。${character.description || ''}
 
 你写了一篇日记：
 标题：${diary.title}
