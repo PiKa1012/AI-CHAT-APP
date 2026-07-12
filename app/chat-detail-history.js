@@ -6,6 +6,7 @@ import { useState, useCallback } from 'react';
 import { formatTime } from '../src/utils/time';
 import { SafeAvatar } from '../src/components/SafeImage';
 import { loadSetting } from '../src/services/settings';
+import { getBubbleSkin } from '../src/services/bubbleSkins';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -24,10 +25,12 @@ export default function ChatDetailHistoryScreen() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
   const [expandCal, setExpandCal] = useState(false);
   const [userProfile, setUserProfile] = useState({});
+  const [bubbleSkin, setBubbleSkin] = useState('default');
+  const [customBubble, setCustomBubble] = useState(null);
 
   useFocusEffect(useCallback(() => {
     if (id) loadDates();
-    (async () => { const p = await loadSetting('user_profile', {}); setUserProfile(p); })();
+    (async () => { const p = await loadSetting('user_profile', {}); setUserProfile(p); const s = await loadSetting('bubble_skin', 'default'); setBubbleSkin(s); if (s === 'custom') { const c = await loadSetting('bubble_custom_colors', { userBg: '#95EC69', userText: '#000', userTime: 'rgba(0,0,0,0.4)', aiBg: '#fff', aiText: '#333', aiTime: '#999' }); setCustomBubble(c); } })();
   }, [id]));
 
   const loadDates = async () => {
@@ -88,13 +91,20 @@ export default function ChatDetailHistoryScreen() {
     const isEmoji = item.message_type === 'emoji';
     const isMusic = item.message_type === 'music_list';
     const ai = aiCharacters.find(a => a.id === item.sender_id);
+    const skin = bubbleSkin === 'custom' && customBubble
+      ? (isUser ? { bg: customBubble.userBg, text: customBubble.userText, time: customBubble.userTime }
+               : { bg: customBubble.aiBg, text: customBubble.aiText, time: customBubble.aiTime })
+      : (isUser ? getBubbleSkin(bubbleSkin).user : getBubbleSkin(bubbleSkin).ai);
+    const bubbleBg = skin.bg;
+    const textColor = skin.text || '#333';
+    const timeColor = skin.time || '#999';
 
     return (
       <View style={[st.row, isUser ? st.rowUser : st.rowAI]}>
         {!isUser && (
           <SafeAvatar uri={ai?.avatar} size={40} name={ai?.name || 'AI'} color="#4A90D9" style={{ marginRight: 8 }} />
         )}
-        <View style={[st.bubble, isUser ? st.bubUser : st.bubAI]}>
+        <View style={[st.bubble, isUser ? st.bubUser : st.bubAI, { backgroundColor: bubbleBg }]}>
           {isImage || isEmoji ? (
             <Image source={{ uri: item.content }} style={st.bubImg} />
           ) : isAudio ? (
@@ -105,7 +115,7 @@ export default function ChatDetailHistoryScreen() {
                   <View key={i} style={[st.waveBar, { height: 6 + i * 2, backgroundColor: isUser ? 'rgba(255,255,255,0.5)' : 'rgba(74,144,217,0.5)' }]} />
                 ))}
               </View>
-              <Text style={[st.bubAudioDur, isUser && { color: '#fff' }]}>{item.content}</Text>
+              <Text style={[st.bubAudioDur, isUser && { color: timeColor }]}>{item.content}</Text>
             </View>
           ) : isMusic ? (
             (() => {
@@ -128,9 +138,9 @@ export default function ChatDetailHistoryScreen() {
               return <Text style={[st.bubText, isUser && st.bubTextUser]}>[音乐]</Text>;
             })()
           ) : (
-            <Text style={[st.bubText, isUser && st.bubTextUser]}>{item.content}</Text>
+            <Text style={[st.bubText, isUser && st.bubTextUser, { color: textColor }]}>{item.content}</Text>
           )}
-          <Text style={[st.bubTime, isUser && st.bubTimeUser]}>{formatTime(item.created_at)}</Text>
+          <Text style={[st.bubTime, isUser && st.bubTimeUser, { color: timeColor }]}>{formatTime(item.created_at)}</Text>
         </View>
         {isUser && (
           userProfile.avatar ? (

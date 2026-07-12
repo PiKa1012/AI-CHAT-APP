@@ -10,20 +10,20 @@ export async function getTodayContext(aiId) {
   
   const messages = await executeQuery(
     `SELECT content, sender_type FROM messages 
-     WHERE created_at >= ? AND (conversation_id IN (
-       SELECT conversation_id FROM conversation_members WHERE member_id = ?
+     WHERE datetime(created_at, '+8 hours') >= ? AND (conversation_id IN (
+        SELECT conversation_id FROM conversation_members WHERE member_id = ?
      ))
      ORDER BY created_at DESC LIMIT 20`,
     [today, aiId]
   );
 
   const moments = await executeQuery(
-    "SELECT content FROM moments WHERE created_at >= ? AND author_type = 'user' ORDER BY created_at DESC LIMIT 5",
+    "SELECT content FROM moments WHERE datetime(created_at, '+8 hours') >= ? AND author_type = 'user' ORDER BY created_at DESC LIMIT 5",
     [today]
   );
 
   const comments = await executeQuery(
-    'SELECT content FROM moment_comments WHERE created_at >= ? ORDER BY created_at DESC LIMIT 5',
+    "SELECT content FROM moment_comments WHERE datetime(created_at, '+8 hours') >= ? ORDER BY created_at DESC LIMIT 5",
     [today]
   );
 
@@ -103,9 +103,11 @@ ${contextText}${avoidRepeat}
   const mood = moodMatch?.[1]?.trim() || '平静';
   const weather = weatherMatch?.[1]?.trim() || '';
 
+  const createdAt = new Date().toISOString();
+
   const diaryId = await executeInsert(
-    'INSERT INTO diaries (ai_id, title, content, mood, weather, images) VALUES (?, ?, ?, ?, ?, ?)',
-    [aiId, title, content, mood, weather, '[]']
+    'INSERT INTO diaries (ai_id, title, content, mood, weather, images, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [aiId, title, content, mood, weather, '[]', createdAt]
   );
 
   let images = [];

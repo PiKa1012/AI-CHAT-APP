@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, Modal, Image, ScrollView, Alert, Pressable } from 'react-native';
 import { styles } from '../../src/components/chat/styles';
 import { useLocalSearchParams, useFocusEffect, useNavigation, router } from 'expo-router';
 import { useAppStore } from '../../src/stores';
@@ -11,10 +11,10 @@ import { sendLocalNotification } from '../../src/services/notification';
 import { getEmojiPacks } from '../../src/services/emoji';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import * as Crypto from 'expo-crypto';
 import { HmacSHA256, enc } from 'crypto-js';
 import { useEffect, useState, useRef, useCallback, useLayoutEffect, useMemo } from 'react';
 import { loadSetting } from '../../src/services/settings';
+import { getBubbleSkin } from '../../src/services/bubbleSkins';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { copyToAppStorage } from '../../src/services/media';
@@ -78,6 +78,8 @@ export default function ChatScreen() {
   const [previewImageUri, setPreviewImageUri] = useState(null);
   const [imageComment, setImageComment] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
+  const [bubbleSkin, setBubbleSkin] = useState('default');
+  const [customBubble, setCustomBubble] = useState(null);
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingEmoji, setPendingEmoji] = useState(null);
   const [showNewMessageHint, setShowNewMessageHint] = useState(false);
@@ -142,6 +144,7 @@ export default function ChatScreen() {
         loadConversations();
         loadUserProfile();
         loadEmojiPacks();
+        loadBubbleSkin();
       }
     }, [id])
   );
@@ -180,6 +183,19 @@ export default function ChatScreen() {
       const data = await loadSetting(`chat_bg_${id}`, { id: 'default', color: '#f5f5f5', image: null });
       if (data) {
         setChatBg(data);
+      }
+    } catch (e) {}
+  };
+
+  const loadBubbleSkin = async () => {
+    try {
+      const skinId = await loadSetting('bubble_skin', 'default');
+      setBubbleSkin(skinId);
+      if (skinId === 'custom') {
+        const c = await loadSetting('bubble_custom_colors', { userBg: '#95EC69', userText: '#000', userTime: 'rgba(0,0,0,0.4)', aiBg: '#fff', aiText: '#333', aiTime: '#999' });
+        setCustomBubble(c);
+      } else {
+        setCustomBubble(null);
       }
     } catch (e) {}
   };
@@ -1067,6 +1083,14 @@ export default function ChatScreen() {
     const aiAvatar = ai?.avatar;
     const aiName = ai?.name || 'AI';
 
+    const skin = bubbleSkin === 'custom' && customBubble
+      ? (isUser ? { bg: customBubble.userBg, text: customBubble.userText, time: customBubble.userTime }
+               : { bg: customBubble.aiBg, text: customBubble.aiText, time: customBubble.aiTime })
+      : (isUser ? getBubbleSkin(bubbleSkin).user : getBubbleSkin(bubbleSkin).ai);
+    const bubbleBg = skin.bg;
+    const textColor = skin.text;
+    const timeColor = skin.time;
+
     return (
       <View style={[styles.messageContainer, isUser ? styles.userMessage : styles.aiMessage]}>
         {!isUser && (
@@ -1080,7 +1104,7 @@ export default function ChatScreen() {
             />
           </TouchableOpacity>
         )}
-        <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
+        <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble, { backgroundColor: bubbleBg }]}>
           {!isUser && conversation?.type === 'group' && (
             <Text style={styles.senderName}>{aiName}</Text>
           )}
@@ -1117,17 +1141,17 @@ export default function ChatScreen() {
                   />
                 ))}
               </View>
-              <Text style={[styles.audioDuration, isUser && styles.audioDurationUser]}>
+              <Text style={[styles.audioDuration, isUser && styles.audioDurationUser, { color: timeColor }]}>
                 {item.content}
               </Text>
             </TouchableOpacity>
           ) : (
-            <Text style={[styles.messageText, isUser && styles.userMessageText]}>
+            <Text style={[styles.messageText, isUser && styles.userMessageText, { color: textColor }]}>
               {item.content}
             </Text>
           )}
           <View style={styles.messageFooter}>
-            <Text style={[styles.messageTime, isUser && styles.userMessageTime]}>
+            <Text style={[styles.messageTime, isUser && styles.userMessageTime, { color: timeColor }]}>
               {formatTime(item.created_at)}
             </Text>
             {!isUser && !isEmoji && !isImage && !isAudio && (
@@ -1288,6 +1312,18 @@ export default function ChatScreen() {
                 <Ionicons name="image-outline" size={22} color="#67C23A" />
               </View>
               <Text style={styles.moreMenuText}>聊天背景</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.moreMenuItem}
+              onPress={() => {
+                setShowMoreMenu(false);
+                router.push('/bubble-skin');
+              }}
+            >
+              <View style={[styles.moreMenuIcon, { backgroundColor: '#9B59B615' }]}>
+                <Ionicons name="chatbubble-ellipses" size={22} color="#9B59B6" />
+              </View>
+              <Text style={styles.moreMenuText}>聊天气泡</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.moreMenuItem}

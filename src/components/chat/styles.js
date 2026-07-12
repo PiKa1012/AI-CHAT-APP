@@ -84,7 +84,7 @@ export const styles = StyleSheet.create({
     elevation: 1,
   },
   userBubble: {
-    backgroundColor: '#4A90D9',
+    backgroundColor: '#95EC69',
     borderBottomRightRadius: 6,
   },
   aiBubble: {
