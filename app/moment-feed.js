@@ -406,7 +406,7 @@ export default function MomentFeedScreen() {
             <SafeAvatar uri={displayAvatar} size={72} name={displayName} color={avatarColor} />
           </TouchableOpacity>
           <Text style={styles.coverName}>{displayName}</Text>
-          <Text style={styles.coverBio}>{targetAI ? (targetAI.signature || '') : (userProfile.bio || '')}</Text>
+          <Text style={styles.coverBio}>{targetAI ? (targetAI.signature || '这个人很懒，什么都没留下') : (userProfile.bio || '')}</Text>
         </View>
       </View>
     );

@@ -95,10 +95,9 @@ export async function callAIAPI(messages, systemPrompt = '', options = {}) {
 
   let content = choice?.message?.content;
   if (!content) {
-    if (choice?.finish_reason === 'tool_calls') {
-      return '';
-    }
-    throw new Error('API返回数据格式错误');
+    if (choice?.finish_reason === 'tool_calls') return '';
+    content = choice?.message?.reasoning_content || '';
+    if (!content) throw new Error('API返回数据格式错误');
   }
   return content;
 }

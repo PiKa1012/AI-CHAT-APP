@@ -321,10 +321,10 @@ export async function aiAutoPostMoment(aiId, userRequest = null, recentMessages 
     ? '内容：(写朋友圈正文)\n配图：(一句话描述配图画面，包含人物、场景、物品)\n回复：(一条简短的聊天回复，告知对方你已发朋友圈，语气活泼自然，要有你的个人风格)'
     : '内容：(写朋友圈正文)\n回复：(一条简短的聊天回复，告知对方你已发朋友圈，语气活泼自然，要有你的个人风格)';
   const prompt = getPersonalityPrompt(ai[0]) + `\n我的名字是${ai[0].name}，用户的名字是${userName}${userInfo ? `，${userInfo}` : ''}。
-请发一条朋友圈，内容要自然真实，像普通人发的朋友圈。用第一人称"我"来写，不要出现我自己的名字。${userReq}${chatContext}
+ 请根据上面的聊天记录发一条朋友圈，话题要跟聊天内容相关。用第一人称"我"来写，像普通人发的朋友圈一样自然。不要出现我自己的名字。${userReq}${chatContext}
 只输出朋友圈正文和配图描述，不要输出其他解释。按照以下格式输出（将括号内容替换为实际文字）：
 ${formatHint}`;
-  const raw = sanitizeAIOutput(await callAIAPI([{ role: 'user', content: '发一条朋友圈' }], prompt));
+  const raw = sanitizeAIOutput(await callAIAPI([{ role: 'user', content: '发一条朋友圈' }], prompt, { max_tokens: 1000 }));
 
   const match = raw.match(/内容[：:]\s*([\s\S]+?)(?=\n*\s*(?:配图|回复)[：:]|\s*$)/);
   let content = match ? match[1].trim() : '';

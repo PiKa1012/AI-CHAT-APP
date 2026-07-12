@@ -109,7 +109,7 @@ export default function AIProfileScreen() {
             </View>
             <View style={s.headerText}>
               <Text style={s.headerName}>{ai.name}</Text>
-              {ai.signature ? <Text style={s.headerSig}>{ai.signature}</Text> : null}
+              {ai.signature ? <Text style={s.headerSig}>{ai.signature}</Text> : <Text style={s.headerSig}>这个人很懒，什么都没留下</Text>}
             </View>
           </View>
         </View>
@@ -131,12 +131,6 @@ export default function AIProfileScreen() {
           </View>
         </View>
 
-        {ai.description ? (
-          <View style={s.card}>
-            <Text style={s.descText}>{ai.description}</Text>
-          </View>
-        ) : null}
-
         {latestMoment ? (
           <View style={s.card}>
             <TouchableOpacity style={s.link} onPress={() => router.push({ pathname: '/moment-feed', params: { filterAuthor: ai.id.toString() } })}>
@@ -152,7 +146,17 @@ export default function AIProfileScreen() {
               <Ionicons name="chevron-forward" size={18} color="#ddd" />
             </TouchableOpacity>
           </View>
-        ) : null}
+        ) : (
+          <View style={s.card}>
+            <TouchableOpacity style={[s.link, { borderBottomWidth: 0 }]} onPress={() => router.push({ pathname: '/moment-feed', params: { filterAuthor: ai.id.toString() } })}>
+              <View style={[s.linkIcon, { backgroundColor: '#67C23A15' }]}>
+                <Ionicons name="images" size={20} color="#67C23A" />
+              </View>
+              <Text style={s.linkLabel}>TA 的朋友圈</Text>
+              <Ionicons name="chevron-forward" size={18} color="#ddd" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <Modal visible={!!previewCover} transparent onRequestClose={() => setPreviewCover(null)}>
           <TouchableOpacity style={s.previewOverlay} activeOpacity={1} onPress={() => setPreviewCover(null)}>
