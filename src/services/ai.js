@@ -93,13 +93,11 @@ async function getUserInfoPrompt() {
 export function getPersonalityPrompt(character) {
   const name = character.name;
   const desc = character.description || '';
-  const signature = character.signature ? `\n个性签名：${character.signature}` : '';
   const timeInfo = getCurrentTimeInfo();
   
-  return `你是${name}。${desc}${signature}
-当前时间：${timeInfo.full}（${timeInfo.period}）
-请用符合以上设定的方式回复，保持简洁自然，像朋友聊天一样。
-不要使用emoji，不要过度热情，保持自然的对话语气。`;
+  return `你是${name}。${desc}
+当前时间：${timeInfo.full}
+像真人聊天一样自然简洁地回复。`;
 }
 
 export function sanitizeAIOutput(text) {
