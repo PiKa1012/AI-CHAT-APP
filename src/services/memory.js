@@ -42,11 +42,12 @@ export async function saveMemory(aiId, type, content, importance = 5, context = 
 }
 
 export async function getRelevantMemories(aiId, query, limit = 10) {
-  const keywords = query
-    .replace(/[^\w\u4e00-\u9fff\s]/g, '')
-    .split(/\s+/)
-    .filter(w => w.length > 1)
-    .slice(0, 5);
+  const clean = query.replace(/[^\w\u4e00-\u9fff]/g, '');
+  const tokens = [];
+  for (let i = 0; i < clean.length - 1; i++) {
+    tokens.push(clean.slice(i, i + 2));
+  }
+  const keywords = [...new Set(tokens)].slice(0, 10);
 
   if (keywords.length === 0) {
     return await executeQuery(
@@ -158,41 +159,6 @@ ${conversationText}
     }
   } catch (e) {
     console.error('生成摘要失败:', e);
-  }
-}
-
-export async function saveMemoryFromExchange(aiId, userMessage, aiResponse, label = '') {
-  const settings = await getAPISettings();
-  if (!settings?.apiKey) return;
-
-  const summaryPrompt = `分析这段对话，提取关键信息并分类。
-
-用户：${userMessage}
-AI：${aiResponse}
-
-分类规则：
-- fact：用户个人信息（姓名、年龄、职业等）
-- preference：用户喜好（喜欢什么、讨厌什么）
-- event：发生的具体事件
-
-输出JSON格式：
-{"type":"分类","content":"总结内容"}
-
-如果没什么值得记住的，输出：{"type":"none","content":""}
-
-只输出JSON，不要其他文字。`;
-
-  try {
-    const result = await callAIAPI([{ role: 'user', content: summaryPrompt }], '你是一个信息提取助手，按用户要求的JSON格式输出。', { max_tokens: 600, endpoint: 'memory' });
-    const parsed = extractJSON(result);
-    if (parsed && parsed.type && parsed.type !== 'none' && parsed.content) {
-      await executeInsert(
-        'INSERT INTO ai_memories (ai_id, memory_type, content, importance) VALUES (?, ?, ?, ?)',
-        [aiId, parsed.type, parsed.content, 5]
-      );
-    }
-  } catch (e) {
-    console.warn(`保存${label}对话记忆失败:`, e?.message || e);
   }
 }
 

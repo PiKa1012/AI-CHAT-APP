@@ -4,7 +4,7 @@ import { getCurrentTimeInfo } from '../utils/time';
 import { getEmojiByMood } from './emoji';
 import { getAIMood, analyzeAndUpdateMood, getMoodPrompt, decayMood } from './emotion';
 import { getAPISettings, clearAPISettingsCache, loadSetting } from './settings';
-import { getRelevantMemories, formatMemoriesForPrompt, extractMemories, saveMemoryFromExchange } from './memory';
+import { getRelevantMemories, formatMemoriesForPrompt, extractMemories } from './memory';
 import { generateMomentImage } from './imageGen';
 import { sendLocalNotification } from './notification';
 import { callAIAPI, searchWeb } from './api-client';
@@ -191,10 +191,6 @@ export async function getAIResponse(aiId, userMessage, recentMessages = []) {
     apiResponse = await callAIAPI(messages, systemPrompt);
   }
 
-  if (settings?.apiKey) {
-    await saveMemoryFromExchange(aiId, userMessage, apiResponse, '');
-  }
-
   if (recentMessages.length > 0 && recentMessages.length % 10 === 0) {
     extractMemories(aiId, recentMessages.slice(-20));
   }
@@ -251,11 +247,6 @@ export async function getGroupAIResponse(aiId, recentMessages, allMembers) {
   const messages = [{ role: 'user', content: userMessage }];
   
   let apiResponse = await callAIAPI(messages, systemPrompt);
-
-  const settings = await getAPISettings();
-  if (settings?.apiKey && apiResponse && apiResponse.length < 200) {
-    await saveMemoryFromExchange(aiId, lastMessage?.content || '', apiResponse, '群聊');
-  }
 
   const updatedMood = await analyzeAndUpdateMood(aiId, lastMessage?.content || '', apiResponse, character);
   const emoji = await tryGetEmojiForResponse(character, apiResponse, updatedMood);
