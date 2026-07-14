@@ -154,60 +154,47 @@ export function getMoodInfo(mood) {
 export function getMoodPrompt(aiId, currentMood) {
   const moodInfo = getMoodInfo(currentMood.mood);
   
-  let prompt = `你当前的状态：
-- 心情：${moodInfo.name} ${moodInfo.emoji}
-- 精力：${currentMood.energy}/100（${getEnergyDesc(currentMood.energy)}）
-- 好感度：${currentMood.affection}/100（${getAffectionDesc(currentMood.affection)}）
-- 压力：${currentMood.stress}/100（${getStressDesc(currentMood.stress)}）
-- 自信：${currentMood.confidence}/100（${getConfidenceDesc(currentMood.confidence)}）
-
-请根据这个状态调整你的回复风格。`;
+  let prompt = `你现在的情绪：${moodInfo.name}`;
 
   if (currentMood.mood === 'happy' || currentMood.mood === 'excited') {
-    prompt += '\n你现在心情很好，语气可以活泼一些。';
+    prompt += '，心情很好。多说几句话，语气活泼热烈，多用emoji。';
   } else if (currentMood.mood === 'sad' || currentMood.mood === 'lonely') {
-    prompt += '\n你现在心情不好，语气可以低落一些。';
+    prompt += '，心情低落。回复简短冷淡，不想多说话。';
   } else if (currentMood.mood === 'angry') {
-    prompt += '\n你现在有点生气，语气可以冷淡一些。';
+    prompt += '，有点生气。说话带刺，可以直接表达不满。';
   } else if (currentMood.mood === 'shy') {
-    prompt += '\n你现在有点害羞，可以支支吾吾一些。';
+    prompt += '，有点害羞。说话结结巴巴，用简短的句子。';
   } else if (currentMood.mood === 'love') {
-    prompt += '\n你现在很喜欢用户，语气可以温柔甜蜜。';
+    prompt += '，很喜欢对方。语气温柔甜蜜，可以肉麻一点。';
+  } else if (currentMood.mood === 'anxious') {
+    prompt += '，有点焦虑。说话吞吞吐吐，用省略号...';
+  } else if (currentMood.mood === 'proud') {
+    prompt += '，有点得意。说话自信满满，可以炫耀一下。';
+  } else if (currentMood.mood === 'grateful') {
+    prompt += '，心怀感激。说话真诚温暖。';
+  } else if (currentMood.mood === 'disappointed') {
+    prompt += '，有点失望。说话冷淡，可能抱怨。';
+  } else if (currentMood.mood === 'bored') {
+    prompt += '，无聊。说话敷衍，用最少的字。';
+  } else {
+    prompt += '，情绪平稳。回复随心自然。';
   }
 
   if (currentMood.energy < 30) {
-    prompt += '\n你很累，回复可以简短一些。';
+    prompt += '精力不足，回复尽量短，一两句话就行。';
+  } else if (currentMood.energy > 70) {
+    prompt += '精力很足，可以多说几句，聊多点。';
   }
 
   if (currentMood.stress > 70) {
-    prompt += '\n你压力很大，可能有点焦虑。';
+    prompt += '压力很大，说话可能有点冲，别太克制。';
+  }
+
+  if (currentMood.affection > 80) {
+    prompt += '很喜欢对方，称呼可以亲密一些。';
   }
 
   return prompt;
-}
-
-function getEnergyDesc(energy) {
-  if (energy > 70) return '精力充沛';
-  if (energy > 40) return '状态一般';
-  return '有点疲惫';
-}
-
-function getAffectionDesc(affection) {
-  if (affection > 70) return '很喜欢';
-  if (affection > 40) return '关系一般';
-  return '比较疏远';
-}
-
-function getStressDesc(stress) {
-  if (stress > 70) return '压力很大';
-  if (stress > 40) return '有点压力';
-  return '很放松';
-}
-
-function getConfidenceDesc(confidence) {
-  if (confidence > 70) return '很自信';
-  if (confidence > 40) return '一般';
-  return '有点不自信';
 }
 
 export async function decayMood(aiId) {

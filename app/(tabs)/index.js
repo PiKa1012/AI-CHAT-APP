@@ -196,7 +196,7 @@ export default function HomeScreen() {
                 <SafeAvatar uri={ai.avatar} size={44} name={ai.name || 'A'} color={cs[ai.id % cs.length]} />
                 <View style={s.aiInfo}>
                   <Text style={s.aiName}>{ai.name}</Text>
-                  <Text style={s.aiDesc}>{ai.description || ai.signature || ''}</Text>
+                  <Text style={s.aiDesc}>{ai.signature || ''}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#ccc" />
               </TouchableOpacity>
@@ -220,7 +220,7 @@ export default function HomeScreen() {
                   <SafeAvatar uri={ai.avatar} size={44} name={ai.name || 'A'} color={cs[ai.id % cs.length]} />
                   <View style={s.aiInfo}>
                     <Text style={s.aiName}>{ai.name}</Text>
-                    <Text style={s.aiDesc}>{ai.description || ai.signature || ''}</Text>
+                    <Text style={s.aiDesc}>{ai.signature || ''}</Text>
                   </View>
                   <Ionicons name={sel ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={sel ? '#4A90D9' : '#ccc'} />
                 </TouchableOpacity>

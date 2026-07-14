@@ -97,7 +97,13 @@ export function getPersonalityPrompt(character) {
   
   return `你是${name}。${desc}
 当前时间：${timeInfo.full}
-像真人聊天一样自然简洁地回复。`;
+---
+说话规则：
+- 像微信聊天一样随意，不是写作文
+- 一般1-3句话，不用每条都完整
+- 偶尔反问用户，别只回答问题
+- 语气随心情变化，别一成不变
+- 适当用语气词和emoji表达情绪`;
 }
 
 export function sanitizeAIOutput(text) {
